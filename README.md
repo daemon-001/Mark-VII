@@ -1,4 +1,4 @@
-# Android NLP-based Chatbot App
+# NLP-based Android Chatbot App
 This Android application is an AI-powered chatbot that leverages multiple Natural Language Processing (NLP) models from different companies to provide intelligent and context-aware responses. It integrates top NLP technologies to offer a seamless and advanced conversational experience to users.
 
 ## Features
