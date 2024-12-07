@@ -48,7 +48,7 @@
 
 ## Installation (Android Smartphones)
 
-* Download [**Mark-VII.apk**](#Download) file from repository.
+* Download APK file from [Github Releases page](https://github.com/daemon-001/Mark-VII/releases)
   
 * Open the downloaded app.
   
@@ -61,7 +61,7 @@
 
 ## Installation (PC Android Emulators)
 
-* Download **Mark-VII.apk** file from repository.
+* Download APK file from [Github Releases page](https://github.com/daemon-001/Mark-VII/releases)
   
 * Now open APK installer of your emulator and select download **.apk** file.
   
