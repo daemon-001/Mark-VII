@@ -13,5 +13,4 @@ This Android application is an AI-powered chatbot that leverages multiple Natura
 * **Android SDK:** Core platform for building the mobile application.
 * **Jetpack Compose:** UI toolkit for building app layout. It simplifies the development process by allowing developers to design UIs using Kotlin code rather than XML
 * **NLP Models:** Integrated models from multiple NLP providers such as OpenAI, Google Cloud NLP, IBM Watson, and more.
-* **Retrofit/Volley:** For API calls and data management between the app and the NLP services.
 * **Lottie:** To use high-quality jason-based animations.
