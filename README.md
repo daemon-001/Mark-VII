@@ -1,5 +1,5 @@
 # NLP-based Android Chatbot App
-This Android application is an AI-powered chatbot that leverages multiple Natural Language Processing (NLP) models from different companies to provide intelligent and context-aware responses. It integrates top NLP technologies to offer a seamless and advanced conversational experience to users.
+**Mark VII** is an AI-powered android chatbot application that leverages multiple Natural Language Processing (NLP) models from different companies to provide intelligent and context-aware responses. It integrates top NLP technologies to offer a seamless and advanced conversational experience to users.
 
 ## Features
 * **Multi-NLP Model Integration:** Uses a combination of NLP models from different companies to generate accurate and diverse responses.
