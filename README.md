@@ -15,13 +15,8 @@
 * **NLP Models:** Integrated models from multiple NLP providers such as OpenAI, Google Cloud NLP, IBM Watson, and more.
 * **Lottie:** To use high-quality jason-based animations.
 
-## Download
-
-* For stable releases, please go to [Github Releases page](https://github.com/daemon-001/Mark-VII/releases)
-* For latest build, please check [Latest Release](https://github.com/daemon-001/Mark-VII/releases/latest)
-
 ## Installation (Android Smartphones)
-* Download [**Mark-VII.apk**](https://github.com/daemon-001/Mark-VII/releases/latest) file from repository.
+* Download [**Mark-VII.apk**](#Download) file from repository.
 * Open the downloaded app.
 * Allow the **Unknown Sources** permission.
 * Now install the app.
@@ -33,3 +28,8 @@
 * Make sure your PC is connected to internet.
 * Lounch **Mark VII** app from emulator's louncher.
 * Ready to use.
+
+## Download
+
+* For stable releases, please go to [Github Releases page](https://github.com/daemon-001/Mark-VII/releases)
+* For latest build, please check [Latest Release](https://github.com/daemon-001/Mark-VII/releases/latest)
