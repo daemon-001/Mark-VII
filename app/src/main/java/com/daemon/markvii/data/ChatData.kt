@@ -15,28 +15,21 @@ object ChatData {
 
 //    _____Faster Response lite computation_____
 //    Latest: gemini-1.5-flash-8b-latest
-//    Latest stable: gemini-1.5-flash-8b
+//    Latest_stable: gemini-1.5-flash-8b
 //    Stable: gemini-1.5-flash-8b-001
 
 //    ______Balanced Computation_____
 //    Latest: gemini-1.5-flash-latest
 //    Latest_stable: gemini-1.5-flash
-//    Stable:
-//    gemini-1.5-flash-001
-//    gemini-1.5-flash-002
-//    Experimental:
-//    gemini-1.5-flash-8b-exp-0924
-//    gemini-1.5-flash-8b-exp-0827
-//    gemini-1.5-flash-exp-0827
+//    Stable: gemini-1.5-flash-001, gemini-1.5-flash-002
+//    Experimental: gemini-1.5-flash-8b-exp-0924, gemini-1.5-flash-8b-exp-0827, gemini-1.5-flash-exp-0827
 
 //    _____Hard Computation____
 //    Latest: gemini-1.5-pro-latest
-//    Latest stable: gemini-1.5-pro
-//    Stable:
-//    gemini-1.5-pro-001
-//    gemini-1.5-pro-002
-//    Experimental:
-//    gemini-1.5-pro-exp-0827
+//    Latest_stable: gemini-1.5-pro
+//    Stable: gemini-1.5-pro-001, gemini-1.5-pro-002
+//    Experimental: gemini-1.5-pro-exp-0827
+//
 
 
     suspend fun getResponse(prompt: String): Chat {
