@@ -16,15 +16,15 @@ This Android application is an AI-powered chatbot that leverages multiple Natura
 * **Lottie:** To use high-quality jason-based animations.
 
 ## Installation (Android Smartphones)
-* Download 'Mark-VII.apk' file from repository.
+* Download **Mark-VII.apk** file from repository.
 * Open the downloaded app.
-* Allow the 'Unknown Sources' permission.
+* Allow the **Unknown Sources** permission.
 * Now install the app.
 * Ready to use. (This app is fully dependent on Internet, make sure you are connected to internet)
 
 ## Installation (PC Android Emulators)
-* Download Mark-VII.apk file from repository.
-* Now open APK installer of your emulator and select download .apk file.
+* Download **Mark-VII.apk** file from repository.
+* Now open APK installer of your emulator and select download **.apk** file.
 * Make sure your PC is connected to internet.
-* Lounch 'Mark VII' app from emulator's louncher.
+* Lounch **Mark VII** app from emulator's louncher.
 * Ready to use.
