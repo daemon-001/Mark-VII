@@ -14,3 +14,10 @@ This Android application is an AI-powered chatbot that leverages multiple Natura
 * **Jetpack Compose:** UI toolkit for building app layout. It simplifies the development process by allowing developers to design UIs using Kotlin code rather than XML
 * **NLP Models:** Integrated models from multiple NLP providers such as OpenAI, Google Cloud NLP, IBM Watson, and more.
 * **Lottie:** To use high-quality jason-based animations.
+
+## Installation (Android Smartphone)
+* Download Mark-VII.apk file from repository.
+* Open the downloaded app.
+* Allow the "Unknown Sources" permission.
+* Now install the app.
+* Ready to use. (This app is fully dependent on Internet, make sure you are connected to internet)
