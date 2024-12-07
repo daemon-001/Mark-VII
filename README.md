@@ -16,7 +16,7 @@
 * **Lottie:** To use high-quality jason-based animations.
 
 ## Installation (Android Smartphones)
-* Download **Mark-VII.apk** file from repository.
+* Download [**Mark-VII.apk**](https://github.com/daemon-001/Mark-VII/releases/latest) file from repository.
 * Open the downloaded app.
 * Allow the **Unknown Sources** permission.
 * Now install the app.
