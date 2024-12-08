@@ -11,7 +11,9 @@ import kotlinx.coroutines.withContext
  */
 object ChatData {
 
-    val api_key = "Your API KEY"
+    val api_key = "YOUR API KEY"
+
+
 
 //    _____Faster Response lite computation_____
 //    Latest: gemini-1.5-flash-8b-latest
