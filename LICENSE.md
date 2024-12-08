@@ -19,3 +19,11 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+This license applies to the GitHub project "Mark VII," an AI-powered Android chatbot
+application that leverages multiple Natural Language Processing (NLP) models from
+different companies to provide intelligent and context-aware responses.
+It integrates top NLP technologies to offer a seamless and advanced conversational experience to users.
+
