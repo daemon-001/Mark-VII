@@ -38,8 +38,10 @@ cd Mark-VII
 ### Configure API Keys
 1. Go to the `com.daemon.markvii/data` folder and locate the `ChatData.kt` file.
 2. Add your API keys for the integrated NLP services:
-   ```val gemini_api_key = "YOUR API KEY"
-   val openai_api_key = "YOUR API KEY"```
+   ```
+   val gemini_api_key = "YOUR API KEY"
+   val openai_api_key = "YOUR API KEY"
+   ```
 
 ### Build and Run
 1. Sync the Gradle files.
