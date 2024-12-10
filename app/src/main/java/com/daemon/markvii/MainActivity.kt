@@ -1,12 +1,12 @@
 package com.daemon.markvii
 
-//import androidx.compose.foundation.layout.ColumnScopeInstance.align
-//import androidx.compose.foundation.layout.FlowColumnScopeInstance.align
-import android.content.Intent
+/**
+ * @author Nitesh
+ */
+
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
@@ -19,17 +19,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -40,17 +41,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
@@ -67,6 +71,7 @@ import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.rememberLottieComposition
+import com.daemon.markvii.data.ChatData
 import com.daemon.markvii.ui.theme.GeminiChatBotTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -75,7 +80,6 @@ import kotlinx.coroutines.flow.update
 class MainActivity : ComponentActivity() {
 
     private val uriState = MutableStateFlow("")
-//    val animationView = LottieAnimationView(this)
 
     private val imagePicker =
         registerForActivityResult<PickVisualMediaRequest, Uri?>(
@@ -89,8 +93,8 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Thread.sleep(1000)
-        installSplashScreen()
+//        Thread.sleep(1000) // splash screen delay
+        installSplashScreen()  // splash screen ui
         setContent {
 
             GeminiChatBotTheme {
@@ -103,12 +107,13 @@ class MainActivity : ComponentActivity() {
                 )
 
                 {
-
+//                    for switching between from home screen to infoTab
                     val navController = rememberNavController()
                     NavHost(navController = navController, startDestination = "home", builder = {
                         composable("home",){
                             opentimes++
                             Scaffold(
+//                                top bar items
                                 topBar = {
                                     var context = LocalContext.current
                                     Box(
@@ -116,36 +121,39 @@ class MainActivity : ComponentActivity() {
                                             .fillMaxWidth()
                                             .background(MaterialTheme.colorScheme.primary)
                                             .height(50.dp)
-                                            .padding(horizontal = 15.dp)
+                                            .padding(start = 15.dp, end = 5.dp)
                                     ) {
-                                        geminiAnimation()
-                                        Text(
+                                        DropDownDemo() // nlp model selector dropdown menu ui
+
+//                                        Spacer(modifier = Modifier.width(8.dp)) // makes blank space
+
+//                                      info tab start icon at top bar
+                                        val composition by rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.info_card))
+                                        LottieAnimation(
+                                            composition = composition,
                                             modifier = Modifier
-                                                .align(Alignment.CenterStart),
-
-                                            text = "AI ChatBot-M7",
-                                            fontSize = 20.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onPrimary
-                                        )
-
-                                        Spacer(modifier = Modifier.width(8.dp))
-
-//                                        Home screen right corner image
-                                        Image(
-                                            modifier = Modifier
-                                                .align(Alignment.CenterEnd)
                                                 .size(60.dp)
+                                                .align(Alignment.CenterEnd)
                                                 .clickable {
                                                     navController.navigate("info_screen")
-                                                    Toast.makeText(context, "Under development...", Toast.LENGTH_SHORT).show()
                                                 },
-                                            painter = painterResource(id = R.drawable.mini_logo),
-                                            contentDescription = "Mini logo"
+                                            iterations = LottieConstants.IterateForever  // Play in loop
                                         )
+//                                        Icon(
+//                                            modifier = Modifier
+//                                                .size(35.dp)
+//                                                .align(Alignment.CenterEnd)
+//                                                .clickable {
+//                                                    navController.navigate("info_screen")
+////                                                    Toast.makeText(context, "Under development...", Toast.LENGTH_SHORT).show()
+//                                                },
+//                                            imageVector = Icons.Rounded.Info,
+//                                            contentDescription = "Info Tab",
+//                                            tint = MaterialTheme.colorScheme.onPrimary
+//                                        )
                                     }
 
-//                                    Greeting once when app open
+//                                    Greet once when app open
                                     val chaViewModel = viewModel<ChatViewModel>()
                                     val bitmap = getBitmap()
                                     if(opentimes==1){
@@ -153,12 +161,12 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             ) {
-                                ChatScreen(paddingValues = it)
+                                ChatScreen(paddingValues = it)  // starting chat screen ui
                             }
 
                         }
                         composable("info_screen",){
-                            infotab1()
+                            InfoSetting() // starting infoTab ui (About section)
                         }
 
                     })
@@ -170,15 +178,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+//    chat home screen ui starts here
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun ChatScreen(paddingValues: PaddingValues) {
-        BigHi()
         val chaViewModel = viewModel<ChatViewModel>()
         val chatState = chaViewModel.chatState.collectAsState().value
         val bitmap = getBitmap()
 
 
+        BigHi() // chat screen background ui function
         Column(
 
             modifier = Modifier
@@ -187,12 +196,13 @@ class MainActivity : ComponentActivity() {
             verticalArrangement = Arrangement.Bottom
         ) {
 
+//            prompt entry textbox starts here
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp),
-                reverseLayout = true
+                reverseLayout = true,
             ) {
                 itemsIndexed(chatState.chatList) { index, chat ->
                     if (chat.isFromUser) {
@@ -207,39 +217,41 @@ class MainActivity : ComponentActivity() {
 
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 0.dp, start = 0.dp, end = 0.dp),
+                    .fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
 
 
                 Column {
-
+//                    picked image display
                     bitmap?.let {
                         Image(
                             modifier = Modifier
-                                .size(40.dp)
-                                .padding(bottom = 2.dp)
-                                .clip(RoundedCornerShape(6.dp)),
+                                .padding(bottom = 10.dp, start = 10.dp)
+                                .size(58.dp)
+                                .clip(CircleShape),
                             contentDescription = "picked image",
                             contentScale = ContentScale.Crop,
                             bitmap = it.asImageBitmap()
                         )
                     }
                 }
-
+// ###################################### Text Field ##################################
                 TextField(
                     modifier = Modifier
-                        .weight(1f),
-
+                        .weight(1f)
+                        .padding(bottom = 10.dp, start = 10.dp, end = 10.dp)
+                        .clip(shape = CircleShape),
                     value = chatState.prompt,
-
+                    singleLine = true,
                     onValueChange = {
                         chaViewModel.onEvent(ChatUiEvent.UpdatePrompt(it))
                     },
                     placeholder = {
                         Text(text = "Ask anything!")
                     },
+
+//                    textbox image picker icon
                     leadingIcon = {
                         val composition by rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.imgpckr))
                         LottieAnimation(
@@ -247,8 +259,7 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier
                                 .size(50.dp)
                                 .clickable {
-                                    imagePicker.launch(
-                                        PickVisualMediaRequest
+                                    imagePicker.launch(PickVisualMediaRequest
                                             .Builder()
                                             .setMediaType(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                             .build()
@@ -258,7 +269,10 @@ class MainActivity : ComponentActivity() {
                             // progress = { }
                         )
                     },
+
+//                    textbox send icon
                     trailingIcon = {
+                        Alignment.Bottom
                         val composition by rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.sendair))
                         LottieAnimation(
                             composition = composition,
@@ -280,36 +294,38 @@ class MainActivity : ComponentActivity() {
 
     }
 
+//    user chat text bubble
     @Composable
     fun UserChatItem(prompt: String, bitmap: Bitmap?) {
         SelectionContainer() {
             Column(
                 modifier = Modifier
-                    .padding(start = 50.dp, bottom = 16.dp)
+                    .padding(start = 50.dp, top = 8.dp, bottom = 8.dp)
                     .fillMaxWidth(),
                 horizontalAlignment = Alignment.End
 
             ) {
-
+//                user picked image display
                 bitmap?.let {
                     Image(
                         modifier = Modifier
                             .fillMaxWidth()
 //                            .height(260.dp)
                             .padding(bottom = 2.dp)
-                            .clip(RoundedCornerShape(12.dp)),
+                            .clip(RoundedCornerShape(20.dp)),
                         contentDescription = "image",
                         contentScale = ContentScale.FillWidth,
                         bitmap = it.asImageBitmap()
                     )
                 }
 
+//                user prompt display
                 Text(
                     modifier = Modifier
 //                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(20.dp))
                         .background(MaterialTheme.colorScheme.primary)
-                        .padding(10.dp),
+                        .padding(start = 15.dp, end = 15.dp, top = 10.dp, bottom = 10.dp),
 //                    textAlign = TextAlign.Right,
                     text = prompt,
                     fontSize = 17.sp,
@@ -321,27 +337,36 @@ class MainActivity : ComponentActivity() {
 
     }
 
+//    model chat text bubble
     @Composable
     fun ModelChatItem(response: String) {
         SelectionContainer() {
             Column(
-                modifier = Modifier.padding(end = 50.dp, bottom = 16.dp)
+                modifier = Modifier.padding(end = 50.dp, top = 8.dp, bottom = 8.dp)
 
 
             ) {
-
-                Text(
+//                model response text display
+                Box(
                     modifier = Modifier
 //                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(20.dp))
                         .background(Color.Black)
                         .padding(16.dp),
-                    text = "\uD835\uDDE0\uD835\uDDEE\uD835\uDDFF\uD835\uDDF8 \uD835\uDDE9\uD835\uDDDC\uD835\uDDDC:\n\n" + response,
-                    fontSize = 17.sp,
-                    color = Color.White
-
-                )
-
+                ){
+                    Text(
+                        text = "Mark VII",
+                        fontSize = 16.sp,
+                        fontFamily = FontFamily(Font(R.font.typographica)),
+                        color = Color.White
+                    )
+                    Text(
+                        text = "\n\n" + response,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontSize = 16.sp,
+                        color = Color.White
+                    )
+                }
 
             }
         }
@@ -365,68 +390,164 @@ class MainActivity : ComponentActivity() {
         return null
     }
 
+//    Dropdown menu of nlp models
+    @Composable
+    fun DropDownDemo() {
+
+        val isDropDownExpanded = remember {
+            mutableStateOf(false)
+        }
+        val itemPosition = remember {
+            mutableStateOf(0)
+        }
+
+        val usernames = listOf("Gemini flash 8b", "Gemini flash", "Gemini pro")
+
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.Center
+        ) {
+
+            Box {
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable {
+                        isDropDownExpanded.value = true
+                    }
+                ) {
+
+                    Text(
+                        text = usernames[itemPosition.value],
+                        fontSize = 20.sp,
+//                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily(Font(R.font.typographica)),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Image(
+                        painter = painterResource(id = R.drawable.drop_down_ic),
+                        contentDescription = "DropDown Icon"
+                    )
+                    ChatData.gemini_api_model = "gemini-1.5-flash-8b"
+
+
+//                    nlp model switcher from dropdown list
+
+//                    Gemini-flash-8b⚡⚡
+                    if (itemPosition.value == 0){
+                        googleGemini()
+                        ChatData.gemini_api_model = "gemini-1.5-flash-8b"
+                    }
+//                    Gemini-flash⚡
+                    if (itemPosition.value == 1){
+                        googleGemini()
+                        ChatData.gemini_api_model = "gemini-1.5-flash-001"
+                    }
+//                    Gemini-pro✨
+                    if (itemPosition.value == 2){
+                        googleGemini()
+                        ChatData.gemini_api_model = "gemini-1.5-pro-001"
+                    }
+
+
+                }
+                DropdownMenu(
+                    expanded = isDropDownExpanded.value,
+                    onDismissRequest = {
+                        isDropDownExpanded.value = false
+                    }) {
+                    var context = LocalContext.current // for making toast
+
+                    usernames.forEachIndexed { index, username ->
+                        DropdownMenuItem(text = {
+                            Text(text = username)
+                        },
+                            onClick = {
+                                isDropDownExpanded.value = false
+                                itemPosition.value = index
+
+//                                if (itemPosition.value == 3){
+//                                    Toast.makeText(context, "Under development...", Toast.LENGTH_SHORT).show()
+//                                }
+
+                            })
+                    }
+                }
+            }
+
+        }
+    }
+
+
+
+// chat screen backgrounds
     @Composable
     fun BigHi(modifier: Modifier = Modifier) {
         Box(
             modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         )  {
+
+//            chat screen background wallpaper
+            Image(
+                alignment = Alignment.Center,
+                painter = painterResource(id = R.drawable.background),
+                contentDescription = "Background",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+
+//            Startup big hi  animation
             val composition by rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.gassist))
             LottieAnimation(
                 composition = composition,
-                modifier = Modifier.size(500.dp),
-//                iterations = LottieConstants.IterateForever,
-                // progress = { }
+                modifier = Modifier
+                    .size(500.dp)
+                    .align(Alignment.Center)
+                    .shadow(300.dp),
+//                iterations = LottieConstants.IterateForever // Play in loop
+//                progress = {}
             )
+
+
         }
     }
 
+//    OpenAI logo at top bar
+//    @Composable
+//    fun chatGPT(modifier: Modifier = Modifier) {
+//        Image(   // Github icon with link
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .size(20.dp)
+//                .padding(end = 70.dp),
+//            alignment = Alignment.CenterEnd,
+//            painter = painterResource(id = R.drawable.openai),
+//            contentDescription = "chat gpt",
+//        )
+//    }
+
+//    Google gemini logo at top bar
     @Composable
-    fun PinFile(modifier: Modifier = Modifier) {
-        Box(
-            modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        )  {
-            val composition by rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.pinfile))
-            LottieAnimation(
-                composition = composition,
-                modifier = Modifier.size(50.dp),
-//                iterations = LottieConstants.IterateForever,
-                // progress = { }
-            )
-        }
+    fun googleGemini(modifier: Modifier = Modifier) {
+        Image(   // Github icon with link
+            modifier = Modifier
+                .fillMaxWidth()
+                .size(30.dp)
+                .padding(end = 70.dp),
+            alignment = Alignment.CenterEnd,
+            painter = painterResource(id = R.drawable.gemini2),
+            contentDescription = "chat gpt",
+        )
     }
 
-    @Composable
-    fun geminiAnimation(modifier: Modifier = Modifier) {
-        Box(
-            modifier
-                .fillMaxSize()
-                .padding(start = 70.dp),
-            contentAlignment = Alignment.CenterStart
-        )  {
-            val composition by rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.gloading))
-            LottieAnimation(
-                composition = composition,
-                modifier = Modifier.size(200.dp),
-                iterations = LottieConstants.IterateForever,
-//                 progress = { }
-            )
-//            var isAnimationVisible by remember { mutableStateOf(true) } // State to control visibility
-//            LaunchedEffect(key1 = Unit) { // Start a delay when the composable is recomposed
-//                delay(3000) // Delay for 3 seconds
-//                isAnimationVisible = false // Hide the animation after delay
-//            }
-//
-//            AnimatedVisibility(visible = isAnimationVisible) { // Show/hide based on state
-//                LottieAnimation( // Your Lottie animation composable
-//                    composition = composition // Your Lottie composition
-//                )
-        }
-    }
+
 
 
 }
+
+
 
 
 
