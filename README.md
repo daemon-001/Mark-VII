@@ -126,6 +126,9 @@ Contributions are welcome! Here's how you can help:
 * For stable releases, please go to [Github Releases page](https://github.com/daemon-001/Mark-VII/releases)
 * For latest build, please check [Latest Release](https://github.com/daemon-001/Mark-VII/releases/latest)
 
+## Snapshots
+![Mark-VII_v1 1](https://github.com/user-attachments/assets/5ef5e209-fb29-47e3-b8b1-0bd9999a3ea9)
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
