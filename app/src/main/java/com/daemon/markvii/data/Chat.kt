@@ -10,3 +10,8 @@ data class Chat (
     val bitmap: Bitmap?,
     val isFromUser: Boolean
 )
+
+
+
+
+

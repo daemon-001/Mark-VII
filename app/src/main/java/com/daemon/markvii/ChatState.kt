@@ -11,3 +11,8 @@ data class ChatState (
     val prompt: String = "",
     val bitmap: Bitmap? = null
 )
+
+
+
+
+

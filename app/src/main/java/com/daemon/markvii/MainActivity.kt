@@ -1,3 +1,4 @@
+
 package com.daemon.markvii
 
 /**
@@ -115,30 +116,30 @@ class MainActivity : ComponentActivity() {
                             Scaffold(
 //                                top bar items
                                 topBar = {
-                                    var context = LocalContext.current
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(MaterialTheme.colorScheme.primary)
-                                            .height(50.dp)
-                                            .padding(start = 15.dp, end = 5.dp)
-                                    ) {
-                                        DropDownDemo() // nlp model selector dropdown menu ui
+                                var context = LocalContext.current
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(MaterialTheme.colorScheme.primary)
+                                        .height(50.dp)
+                                        .padding(start = 15.dp, end = 5.dp)
+                                ) {
+                                    DropDownDemo() // nlp model selector dropdown menu ui
 
 //                                        Spacer(modifier = Modifier.width(8.dp)) // makes blank space
 
 //                                      info tab start icon at top bar
-                                        val composition by rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.info_card))
-                                        LottieAnimation(
-                                            composition = composition,
-                                            modifier = Modifier
-                                                .size(60.dp)
-                                                .align(Alignment.CenterEnd)
-                                                .clickable {
-                                                    navController.navigate("info_screen")
-                                                },
-                                            iterations = LottieConstants.IterateForever  // Play in loop
-                                        )
+                                    val composition by rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.info_card))
+                                    LottieAnimation(
+                                        composition = composition,
+                                        modifier = Modifier
+                                            .size(60.dp)
+                                            .align(Alignment.CenterEnd)
+                                            .clickable {
+                                                navController.navigate("info_screen")
+                                            },
+                                        iterations = LottieConstants.IterateForever  // Play in loop
+                                    )
 //                                        Icon(
 //                                            modifier = Modifier
 //                                                .size(35.dp)
@@ -151,15 +152,15 @@ class MainActivity : ComponentActivity() {
 //                                            contentDescription = "Info Tab",
 //                                            tint = MaterialTheme.colorScheme.onPrimary
 //                                        )
-                                    }
+                                }
 
 //                                    Greet once when app open
-                                    val chaViewModel = viewModel<ChatViewModel>()
-                                    val bitmap = getBitmap()
-                                    if(opentimes==1){
-                                        chaViewModel.onStart(ChatUiEvent.SendPrompt("Greet me with a unique quote and ask me for any help", bitmap))
-                                    }
+                                val chaViewModel = viewModel<ChatViewModel>()
+                                val bitmap = getBitmap()
+                                if(opentimes==1){
+                                    chaViewModel.onStart(ChatUiEvent.SendPrompt("Greet me with a unique quote and ask me for any help", bitmap))
                                 }
+                            }
                             ) {
                                 ChatScreen(paddingValues = it)  // starting chat screen ui
                             }
