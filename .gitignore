@@ -13,3 +13,5 @@
 .externalNativeBuild
 .cxx
 local.properties
+/app/src/main/java/com/daemon/markvii/data/Keys.kt
+/#_resources_and_previous_builds

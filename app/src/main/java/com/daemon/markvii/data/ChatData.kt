@@ -11,7 +11,8 @@ import kotlinx.coroutines.withContext
  */
 object ChatData {
 
-    val gemini_api_key = "AIzaSyCzbkmiskOKhCZDaysJ541mUS1t7r02FE8"
+//    val gpt_api_key = "Enter your API Key"
+    val gemini_api_key = Keys.gemini_api_key ?: "your-api-key"
 //    val gpt_api_key = ""
 
     var gemini_api_model = ""
