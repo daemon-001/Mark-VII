@@ -8,6 +8,7 @@ package com.daemon.markvii
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
@@ -73,9 +74,12 @@ import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.daemon.markvii.data.ChatData
+import com.daemon.markvii.data.ModelConfiguration
 import com.daemon.markvii.ui.theme.GeminiChatBotTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+
+
 
 
 class MainActivity : ComponentActivity() {
@@ -394,90 +398,81 @@ class MainActivity : ComponentActivity() {
 //    Dropdown menu of nlp models
     @Composable
     fun DropDownDemo() {
+        val isDropDownExpanded = remember { mutableStateOf(false) }
+        val itemPosition = remember { mutableStateOf(0) }
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.Start,
+        verticalArrangement = Arrangement.Center
+    ) {
 
-        val isDropDownExpanded = remember {
-            mutableStateOf(false)
-        }
-        val itemPosition = remember {
-            mutableStateOf(0)
-        }
-
-        val usernames = listOf("Gemini flash 8b", "Gemini flash", "Gemini pro")
-
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.Center
-        ) {
-
-            Box {
-                Row(
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable {
-                        isDropDownExpanded.value = true
-                    }
-                ) {
-
-                    Text(
-                        text = usernames[itemPosition.value],
-                        fontSize = 20.sp,
-//                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily(Font(R.font.typographica)),
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                    Image(
-                        painter = painterResource(id = R.drawable.drop_down_ic),
-                        contentDescription = "DropDown Icon"
-                    )
-                    ChatData.gemini_api_model = "gemini-1.5-flash-8b"
-
-
-//                    nlp model switcher from dropdown list
-
-//                    Gemini-flash-8b⚡⚡
-                    if (itemPosition.value == 0){
-                        googleGemini()
-                        ChatData.gemini_api_model = "gemini-1.5-flash-8b"
-                    }
-//                    Gemini-flash⚡
-                    if (itemPosition.value == 1){
-                        googleGemini()
-                        ChatData.gemini_api_model = "gemini-1.5-flash-001"
-                    }
-//                    Gemini-pro✨
-                    if (itemPosition.value == 2){
-                        googleGemini()
-                        ChatData.gemini_api_model = "gemini-1.5-pro-001"
-                    }
-
-
+        Box {
+            Row(
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable {
+                    isDropDownExpanded.value = true
                 }
-                DropdownMenu(
-                    expanded = isDropDownExpanded.value,
-                    onDismissRequest = {
-                        isDropDownExpanded.value = false
-                    }) {
-                    var context = LocalContext.current // for making toast
+            ) {
 
-                    usernames.forEachIndexed { index, username ->
-                        DropdownMenuItem(text = {
-                            Text(text = username)
-                        },
-                            onClick = {
-                                isDropDownExpanded.value = false
-                                itemPosition.value = index
+                Text(
+                    text = ModelConfiguration.models[itemPosition.value].displayName,
+                    fontSize = 20.sp,
+                    fontFamily = FontFamily(Font(R.font.typographica)),
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+                Image(
+                    painter = painterResource(id = R.drawable.drop_down_ic),
+                    contentDescription = "DropDown Icon"
+                )
 
-//                                if (itemPosition.value == 3){
-//                                    Toast.makeText(context, "Under development...", Toast.LENGTH_SHORT).show()
-//                                }
+                // Set initial model
+                ChatData.gemini_api_model = ModelConfiguration.models[itemPosition.value].apiModel
 
-                            })
+                // Model switcher logic - more flexible approach
+                when (itemPosition.value) {
+                    0, 1, 2 -> {
+                        // Gemini models
+                        googleGemini()
+                        ChatData.gemini_api_model = ModelConfiguration.models[itemPosition.value].apiModel
                     }
+                    3, 4, 5, 6, 7 -> {
+                        // Claude and GPT models - add appropriate handlers
+                        // ChatData.api_model = ModelConfiguration.models[itemPosition.value].apiModel
+                    }
+                    // Add more cases as needed for other model types
                 }
             }
 
+            DropdownMenu(
+                expanded = isDropDownExpanded.value,
+                onDismissRequest = {
+                    isDropDownExpanded.value = false
+                }) {
+                val context = LocalContext.current
+
+                ModelConfiguration.models.forEachIndexed { index, model ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(text = model.displayName)
+                        },
+                        onClick = {
+                            isDropDownExpanded.value = false
+                            itemPosition.value = index
+
+                            // Handle unavailable models
+                            if (!model.isAvailable) {
+                                Toast.makeText(context, "Under development...", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    )
+                }
+            }
         }
+    }
+
+
+
     }
 
 
