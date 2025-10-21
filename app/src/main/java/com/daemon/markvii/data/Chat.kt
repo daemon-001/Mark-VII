@@ -8,7 +8,8 @@ import android.graphics.Bitmap
 data class Chat (
     val prompt: String,
     val bitmap: Bitmap?,
-    val isFromUser: Boolean
+    val isFromUser: Boolean,
+    val modelUsed: String = "" // Model identifier (e.g., "deepseek/deepseek-chat-v3.1")
 )
 
 

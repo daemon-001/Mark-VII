@@ -1,11 +1,10 @@
 package com.daemon.markvii.data
 
 import android.graphics.Bitmap
-import com.google.ai.client.generativeai.GenerativeModel
-import com.google.ai.client.generativeai.type.content
+import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlin.collections.listOf
+import java.io.ByteArrayOutputStream
 
 /**
  * @author Nitesh
@@ -21,135 +20,196 @@ data class ModelInfo(
 )
 
 /**
- * Configuration class for all AI models
- * Centralized location for managing model definitions
+ * Configuration class for all AI models via OpenRouter
+ * Models are now loaded ONLY from Firebase - no hardcoded models
  */
 object ModelConfiguration {
-
-    val models = listOf(
-        ModelInfo("Gemini 1.5 8b ⚡", "gemini-1.5-flash-8b"),
-        ModelInfo("Gemini 1.5 ⚡⚡", "gemini-1.5-flash"),
-        ModelInfo("Gemini 2.0 lite 🤖", "gemini-2.0-flash-lite"),
-        ModelInfo("Gemini 2.0 🤖🤖", "gemini-2.0-flash"),
-        ModelInfo("Gemini 2.5 lite 🚀", "gemini-2.5-flash-lite"),
-        ModelInfo("Gemini 2.5 🚀🚀", "gemini-2.5-flash"),
-
-
-
-
-
-
-//        ModelInfo("Gemini 2.5 pro", "gemini-2.5-pro"),//
-//        ModelInfo("gemini-2.5-flash-preview-tts", "gemini-2.5-flash-preview-tts"), //audio op
-//        ModelInfo("gemini-2.0-flash-preview-image-generation", "gemini-2.0-flash-preview-image-generation"),//image op
-//        ModelInfo("gemini-1.5-pro", "gemini-1.5-pro"),//
-//        ModelInfo("gemini-embedding-exp", "gemini-embedding-exp"),//not avail
-//        ModelInfo("imagen-3.0-generate-002", "imagen-3.0-generate-002"),//
-//        ModelInfo("veo-2.0-generate-001", "veo-2.0-generate-001"),//
-//        ModelInfo("gemini-2.0-flash-live-001", "gemini-2.0-flash-live-001"),//
-
-
-//        ModelInfo("Gemini Flash 8B ⚡⚡", "gemini-1.5-flash-8b"),
-//        ModelInfo("Gemini Flash ⚡", "gemini-1.5-flash-001"),
-//        ModelInfo("Gemini Pro ✨", "gemini-2.5-pro"),
-//        ModelInfo("Gemini Ultra 🚀", "gemini-ultra"),
-//        ModelInfo("Claude Sonnet 🎭", "claude-sonnet"),
-//        ModelInfo("GPT-4 Turbo 🔥", "gpt-4-turbo"),
-//        ModelInfo("LLaMA 2 🦙", "llama-2-70b"),
-//        ModelInfo("PaLM 2 🌴", "palm-2"),
-//        ModelInfo("Mistral 7B 🌪️", "mistral-7b"),
-//        ModelInfo("CodeLlama 💻", "codellama-34b")
-    )
+    // Empty list - all models must come from Firebase
+    // NO hardcoded models - app requires Firebase configuration
+    val models = emptyList<ModelInfo>()
 }
 
 object ChatData {
 
-//    val gpt_api_key = "Enter your API Key"
-    val gemini_api_key = Keys.gemini_api_key ?: "your-api-key"  // Set here your api key
-//    val gpt_api_key = ""
+    // API key loaded ONLY from Firebase - no local fallback
+    var openrouter_api_key: String = ""
 
-    var gemini_api_model = ""
-//    var gpt_api_model = ""
+    var selected_model = ""
 
+    /**
+     * Update API key from Firebase
+     * This is the ONLY way to set the API key
+     */
+    fun updateApiKey(newKey: String) {
+        if (newKey.isNotEmpty()) {
+            openrouter_api_key = newKey
+            OpenRouterClient.updateApiKey(openrouter_api_key)
+        }
+    }
+    
+    /**
+     * Convert Bitmap to Base64 string for API
+     */
+    private fun bitmapToBase64(bitmap: Bitmap): String {
+        val outputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
+        val byteArray = outputStream.toByteArray()
+        return Base64.encodeToString(byteArray, Base64.NO_WRAP)
+    }
 
     suspend fun getResponse(prompt: String): Chat {
-        val generativeModel = GenerativeModel(
-            modelName = gemini_api_model, apiKey = gemini_api_key
-        )
-
         try {
+            // Check if API key is loaded
+            if (openrouter_api_key.isEmpty()) {
+                return Chat(
+                    prompt = "⚠️ API Key Missing!\n\nPlease configure Firebase:\n1. Add OpenRouter API key to Firebase\n2. Field: openrouterApiKey\n3. Location: app_config/api_keys\n\nSee TROUBLESHOOTING_401_ERROR.md",
+                    bitmap = null,
+                    isFromUser = false,
+                    modelUsed = ""
+                )
+            }
+            
+            // Use a valid default model if none selected
+            val modelToUse = when {
+                selected_model.isNotEmpty() -> selected_model
+                else -> "anthropic/claude-3-5-sonnet-20241022" // Updated model name
+            }
+            
+            val request = OpenRouterRequest(
+                model = modelToUse,
+                messages = listOf(
+                    Message(
+                        role = "user",
+                        content = listOf(
+                            Content(
+                                type = "text",
+                                text = prompt
+                            )
+                        )
+                    )
+                ),
+                max_tokens = 2000,
+                temperature = 0.7
+            )
+
             val response = withContext(Dispatchers.IO) {
-                generativeModel.generateContent(prompt)
+                OpenRouterClient.api.chatCompletion(request)
             }
 
+            // Check for errors
+            if (response.error != null) {
+                val errorMsg = when {
+                    response.error.message.contains("401") || response.error.message.contains("Unauthorized") -> 
+                        "⚠️ HTTP 401: Unauthorized\n\nYour API key is invalid or missing.\n\nSolution:\n1. Get key from: https://openrouter.ai/keys\n2. Add to Firebase: app_config/api_keys\n3. Field: openrouterApiKey\n\nSee TROUBLESHOOTING_401_ERROR.md"
+                    response.error.message.contains("404") || response.error.message.contains("Not Found") ->
+                        "⚠️ HTTP 404: Model Not Found\n\nThe model '$modelToUse' doesn't exist.\n\nSolution:\n1. Check model name in Firebase\n2. Use valid OpenRouter model\n3. See available models: https://openrouter.ai/models\n\nCommon models:\n- anthropic/claude-3-5-sonnet-20241022\n- openai/gpt-4-turbo\n- openai/gpt-3.5-turbo"
+                    else -> "Error: ${response.error.message}"
+                }
+                return Chat(
+                    prompt = errorMsg,
+                    bitmap = null,
+                    isFromUser = false,
+                    modelUsed = modelToUse
+                )
+            }
+
+            // Get response text
+            val responseText = response.choices?.firstOrNull()?.message?.content 
+                ?: "No response received"
+
             return Chat(
-                prompt = response.text ?: "error",
+                prompt = responseText,
                 bitmap = null,
-                isFromUser = false
+                isFromUser = false,
+                modelUsed = modelToUse
             )
 
         } catch (e: Exception) {
+            val errorMsg = when {
+                e.message?.contains("401") == true -> 
+                    "⚠️ HTTP 401: Unauthorized\n\nYour OpenRouter API key is invalid.\n\nSteps to fix:\n1. Go to https://openrouter.ai/keys\n2. Create/copy your API key\n3. Add to Firebase: app_config/api_keys/openrouterApiKey\n4. Restart app\n\nSee TROUBLESHOOTING_401_ERROR.md for details"
+                e.message?.contains("403") == true -> 
+                    "⚠️ HTTP 403: Forbidden\n\nCheck OpenRouter account credits"
+                e.message?.contains("404") == true ->
+                    "⚠️ HTTP 404: Model Not Found\n\nThe selected model doesn't exist on OpenRouter.\n\nSolution:\n1. Update model names in Firebase\n2. Use valid OpenRouter models\n3. Check: https://openrouter.ai/models\n\nWorking models:\n- anthropic/claude-3-5-sonnet-20241022\n- openai/gpt-4-turbo-preview\n- openai/gpt-3.5-turbo"
+                e.message?.contains("429") == true -> 
+                    "⚠️ Rate Limited\n\nToo many requests. Wait a moment and try again."
+                else -> "Error: ${e.message ?: "Network error"}\n\nCheck internet connection and Firebase configuration."
+            }
             return Chat(
-//                prompt = "Model Offline",
-                prompt = e.message ?: "error",
+                prompt = errorMsg,
                 bitmap = null,
-                isFromUser = false
+                isFromUser = false,
+                modelUsed = selected_model
             )
         }
-
     }
 
     suspend fun getResponseWithImage(prompt: String, bitmap: Bitmap): Chat {
-        val generativeModel = GenerativeModel(
-
-            modelName = "gemini-2.5-flash", apiKey = gemini_api_key
-        )
-
-
         try {
-
-            val inputContent = content {
-                image(bitmap)
-                text(prompt)
+            // Convert bitmap to base64
+            val base64Image = bitmapToBase64(bitmap)
+            val dataUrl = "data:image/jpeg;base64,$base64Image"
+            
+            // Use a valid default model if none selected
+            val modelToUse = when {
+                selected_model.isNotEmpty() -> selected_model
+                else -> "anthropic/claude-3-5-sonnet-20241022" // Updated model name
             }
+
+            val request = OpenRouterRequest(
+                model = modelToUse,
+                messages = listOf(
+                    Message(
+                        role = "user",
+                        content = listOf(
+                            Content(
+                                type = "image_url",
+                                image_url = ImageUrl(url = dataUrl)
+                            ),
+                            Content(
+                                type = "text",
+                                text = prompt
+                            )
+                        )
+                    )
+                ),
+                max_tokens = 2000,
+                temperature = 0.7
+            )
 
             val response = withContext(Dispatchers.IO) {
-                generativeModel.generateContent(inputContent)
+                OpenRouterClient.api.chatCompletion(request)
             }
 
+            // Check for errors
+            if (response.error != null) {
+                return Chat(
+                    prompt = "Error: ${response.error.message}",
+                    bitmap = null,
+                    isFromUser = false,
+                    modelUsed = modelToUse
+                )
+            }
+
+            // Get response text
+            val responseText = response.choices?.firstOrNull()?.message?.content 
+                ?: "No response received"
+
             return Chat(
-                prompt = response.text ?: "error",
+                prompt = responseText,
                 bitmap = null,
-                isFromUser = false
+                isFromUser = false,
+                modelUsed = modelToUse
             )
 
         } catch (e: Exception) {
             return Chat(
-                prompt = "Model Offline",
-//                prompt = e.message ?: "error",
+                prompt = "Model Offline: ${e.message}",
                 bitmap = null,
-                isFromUser = false
+                isFromUser = false,
+                modelUsed = selected_model
             )
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

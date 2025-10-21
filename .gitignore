@@ -13,5 +13,9 @@
 .externalNativeBuild
 .cxx
 local.properties
-/app/src/main/java/com/daemon/markvii/data/Keys.kt
 /#_resources_and_previous_builds
+FIREBASE_SETUP.md
+
+# Firebase
+app/google-services.json
+/update_models/mark-vii-firebase-service-account-key.json

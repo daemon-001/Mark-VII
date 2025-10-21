@@ -46,6 +46,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -75,7 +78,10 @@ import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.daemon.markvii.data.ChatData
 import com.daemon.markvii.data.ModelConfiguration
-import com.daemon.markvii.ui.theme.GeminiChatBotTheme
+import com.daemon.markvii.data.ModelInfo
+import com.daemon.markvii.data.FirebaseConfigManager
+import com.daemon.markvii.data.FirebaseModelInfo
+import com.daemon.markvii.ui.theme.MarkVIITheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
@@ -102,7 +108,12 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()  // splash screen ui
         setContent {
 
-            GeminiChatBotTheme {
+            MarkVIITheme {
+                // Initialize Firebase configuration at app startup
+                LaunchedEffect(Unit) {
+                    FirebaseConfigManager.initialize()
+                }
+                
                 var opentimes by remember { mutableIntStateOf(0) }
                 // A surface container using the 'background' color from the theme
                 Surface(
@@ -158,11 +169,10 @@ class MainActivity : ComponentActivity() {
 //                                        )
                                 }
 
-//                                    Greet once when app open
+//                                    Show welcome guide once when app opens (no API call)
                                 val chaViewModel = viewModel<ChatViewModel>()
-                                val bitmap = getBitmap()
                                 if(opentimes==1){
-                                    chaViewModel.onStart(ChatUiEvent.SendPrompt("Greet me with a unique quote and ask me for any help", bitmap))
+                                    chaViewModel.showWelcomeGuide()
                                 }
                             }
                             ) {
@@ -215,7 +225,7 @@ class MainActivity : ComponentActivity() {
                             prompt = chat.prompt, bitmap = chat.bitmap
                         )
                     } else {
-                        ModelChatItem(response = chat.prompt)
+                        ModelChatItem(response = chat.prompt, modelUsed = chat.modelUsed)
                     }
                 }
             }
@@ -344,7 +354,22 @@ class MainActivity : ComponentActivity() {
 
 //    model chat text bubble
     @Composable
-    fun ModelChatItem(response: String) {
+    fun ModelChatItem(response: String, modelUsed: String = "") {
+        // Extract brand name from model (e.g., "deepseek/deepseek-chat-v3.1" -> "Deepseek")
+        val brandName = if (modelUsed.isNotEmpty()) {
+            val brand = modelUsed.substringBefore("/")
+            brand.split("-", "_").firstOrNull()?.replaceFirstChar { it.uppercase() } 
+                ?: brand.replaceFirstChar { it.uppercase() }
+        } else {
+            ""
+        }
+        
+        val headerText = if (brandName.isNotEmpty()) {
+            "Mark VII  x  $brandName"
+        } else {
+            "Mark VII"
+        }
+        
         SelectionContainer() {
             Column(
                 modifier = Modifier.padding(end = 50.dp, top = 8.dp, bottom = 8.dp)
@@ -360,7 +385,7 @@ class MainActivity : ComponentActivity() {
                         .padding(16.dp),
                 ){
                     Text(
-                        text = "Mark VII",
+                        text = headerText,
                         fontSize = 16.sp,
                         fontFamily = FontFamily(Font(R.font.typographica)),
                         color = Color.White
@@ -400,6 +425,28 @@ class MainActivity : ComponentActivity() {
     fun DropDownDemo() {
         val isDropDownExpanded = remember { mutableStateOf(false) }
         val itemPosition = remember { mutableStateOf(0) }
+        val scope = rememberCoroutineScope()
+        
+        // Observe Firebase models and API key
+        val firebaseModels by FirebaseConfigManager.models.collectAsState()
+        val firebaseApiKey by FirebaseConfigManager.apiKey.collectAsState()
+        val configState by FirebaseConfigManager.configState.collectAsState()
+        
+        // Use ONLY Firebase models - no local fallback
+        val currentModels = if (firebaseModels.isNotEmpty()) {
+            firebaseModels.map { ModelInfo(it.displayName, it.apiModel, it.isAvailable) }
+        } else {
+            // If Firebase not configured, show empty list
+            emptyList()
+        }
+        
+        // Update API key when Firebase data changes
+        LaunchedEffect(firebaseApiKey) {
+            if (firebaseApiKey.isNotEmpty()) {
+                ChatData.updateApiKey(firebaseApiKey)
+            }
+        }
+        
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.Start,
@@ -415,32 +462,51 @@ class MainActivity : ComponentActivity() {
                 }
             ) {
 
-                Text(
-                    text = ModelConfiguration.models[itemPosition.value].displayName,
-                    fontSize = 20.sp,
-                    fontFamily = FontFamily(Font(R.font.typographica)),
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
+                // Show loading indicator, model name, or error message
+                when (configState) {
+                    is FirebaseConfigManager.ConfigState.Loading -> {
+                        Text(
+                            text = "Loading...",
+                            fontSize = 20.sp,
+                            fontFamily = FontFamily(Font(R.font.typographica)),
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                    is FirebaseConfigManager.ConfigState.Error -> {
+                        Text(
+                            text = "Firebase Required",
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily(Font(R.font.typographica)),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    else -> {
+                        if (currentModels.isNotEmpty() && itemPosition.value < currentModels.size) {
+                            Text(
+                                text = currentModels[itemPosition.value].displayName,
+                                fontSize = 20.sp,
+                                fontFamily = FontFamily(Font(R.font.typographica)),
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        } else {
+                            Text(
+                                text = "Setup Firebase",
+                                fontSize = 16.sp,
+                                fontFamily = FontFamily(Font(R.font.typographica)),
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+                
                 Image(
                     painter = painterResource(id = R.drawable.drop_down_ic),
                     contentDescription = "DropDown Icon"
                 )
 
                 // Set initial model
-                ChatData.gemini_api_model = ModelConfiguration.models[itemPosition.value].apiModel
-
-                // Model switcher logic - more flexible approach
-                when (itemPosition.value) {
-                    0, 1, 2 -> {
-                        // Gemini models
-                        googleGemini()
-                        ChatData.gemini_api_model = ModelConfiguration.models[itemPosition.value].apiModel
-                    }
-                    3, 4, 5, 6, 7 -> {
-                        // Claude and GPT models - add appropriate handlers
-                        // ChatData.api_model = ModelConfiguration.models[itemPosition.value].apiModel
-                    }
-                    // Add more cases as needed for other model types
+                if (currentModels.isNotEmpty() && itemPosition.value < currentModels.size) {
+                    ChatData.selected_model = currentModels[itemPosition.value].apiModel
                 }
             }
 
@@ -451,21 +517,40 @@ class MainActivity : ComponentActivity() {
                 }) {
                 val context = LocalContext.current
 
-                ModelConfiguration.models.forEachIndexed { index, model ->
+                if (currentModels.isEmpty()) {
+                    // Show message when Firebase not configured
                     DropdownMenuItem(
                         text = {
-                            Text(text = model.displayName)
+                            Text(
+                                text = "⚠️ Firebase not configured\nPlease set up Firebase with models and API key",
+                                color = MaterialTheme.colorScheme.error
+                            )
                         },
                         onClick = {
                             isDropDownExpanded.value = false
-                            itemPosition.value = index
-
-                            // Handle unavailable models
-                            if (!model.isAvailable) {
-                                Toast.makeText(context, "Under development...", Toast.LENGTH_SHORT).show()
-                            }
+                            Toast.makeText(context, "Please configure Firebase first", Toast.LENGTH_LONG).show()
                         }
                     )
+                } else {
+                    currentModels.forEachIndexed { index, model ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(text = model.displayName)
+                            },
+                            onClick = {
+                                isDropDownExpanded.value = false
+                                itemPosition.value = index
+                                
+                                // Update the selected model
+                                ChatData.selected_model = model.apiModel
+
+                                // Handle unavailable models
+                                if (!model.isAvailable) {
+                                    Toast.makeText(context, "Model temporarily unavailable", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -510,33 +595,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-//    OpenAI logo at top bar
-//    @Composable
-//    fun chatGPT(modifier: Modifier = Modifier) {
-//        Image(   // Github icon with link
-//            modifier = Modifier
-//                .fillMaxWidth()
-//                .size(20.dp)
-//                .padding(end = 70.dp),
-//            alignment = Alignment.CenterEnd,
-//            painter = painterResource(id = R.drawable.openai),
-//            contentDescription = "chat gpt",
-//        )
-//    }
-
-//    Google gemini logo at top bar
-    @Composable
-    fun googleGemini(modifier: Modifier = Modifier) {
-        Image(   // Github icon with link
-            modifier = Modifier
-                .fillMaxWidth()
-                .size(30.dp)
-                .padding(end = 70.dp),
-            alignment = Alignment.CenterEnd,
-            painter = painterResource(id = R.drawable.gemini2),
-            contentDescription = "chat gpt",
-        )
-    }
 
 
 

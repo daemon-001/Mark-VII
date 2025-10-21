@@ -1,0 +1,50 @@
+apiModel,displayName,isAvailable,order
+google/gemini-2.0-flash-exp,Gemini 2.0 Flash,TRUE,1
+google/gemma-3n-e4b-it,Google Gemma 3N E4B,TRUE,2
+google/gemma-3n-e2b-it,Google Gemma 3N E2B,TRUE,3
+google/gemma-3-4b-it,Google Gemma 3 4B,TRUE,4
+google/gemma-3-12b-it,Google Gemma 3 12B,TRUE,5
+google/gemma-3-27b-it,Google Gemma 3 27B,TRUE,6
+google/gemma-2-9b-it,Google Gemma 2 9B,TRUE,7
+nvidia/nemotron-nano-9b-v2,Nvidia Nemotron Nano,TRUE,8
+microsoft/mai-ds-r1,Microsoft Mai DS R1,TRUE,9
+deepseek/deepseek-chat-v3.1,Deepseek Chat V3.1,TRUE,10
+deepseek/deepseek-r1-0528-qwen3-8b,Deepseek R1 Qwen3 8B,TRUE,11
+deepseek/deepseek-r1-0528,Deepseek R1 0528,TRUE,12
+deepseek/deepseek-chat-v3-0324,Deepseek Chat V3,TRUE,13
+deepseek/deepseek-r1-distill-llama-70b,Deepseek R1 Distill Llama,TRUE,14
+deepseek/deepseek-r1,Deepseek R1,TRUE,15
+meta-llama/llama-3.3-8b-instruct,Meta Llama 3.3 Instruct,TRUE,16
+meta-llama/llama-4-maverick,Meta Llama 4 Maverick,TRUE,17
+meta-llama/llama-4-scout,Meta Llama 4 Scout,TRUE,18
+meta-llama/llama-3.3-70b-instruct,Meta Llama 3.3 Instruct,TRUE,19
+meta-llama/llama-3.2-3b-instruct,Meta Llama 3.2 Instruct,TRUE,20
+qwen/qwen3-coder,Qwen3 Coder,TRUE,21
+qwen/qwen3-4b,Qwen3 4B,TRUE,22
+qwen/qwen3-30b-a3b,Qwen3 30B A3B,TRUE,23
+qwen/qwen3-8b,Qwen3 8B,TRUE,24
+qwen/qwen3-14b,Qwen3 14B,TRUE,25
+qwen/qwen3-235b-a22b,Qwen3 235B A22B,TRUE,26
+qwen/qwen2.5-vl-32b-instruct,Qwen 2.5 Vl 32B Instruct,TRUE,27
+qwen/qwen-2.5-coder-32b-instruct,Qwen 2.5 Coder 32B Instruct,TRUE,28
+qwen/qwen-2.5-72b-instruct,Qwen 2.5 72B Instruct,TRUE,29
+mistralai/mistral-small-3.1-24b-instruct,Mistral Small 3.1 Instruct,TRUE,30
+mistralai/mistral-7b-instruct,Mistral 7B Instruct,TRUE,31
+mistralai/mistral-nemo,Mistral Nemo,TRUE,32
+mistralai/mistral-small-24b-instruct-2501,Mistral Small 24B Instruct,TRUE,33
+mistralai/mistral-small-3.2-24b-instruct,Mistral Small 3.2 Instruct,TRUE,34
+mistralai/devstral-small-2505,Mistral Devstral Small,TRUE,35
+moonshotai/kimi-k2,Moonshotai Kimi K2,TRUE,36
+moonshotai/kimi-dev-72b,Moonshotai Kimi Dev,TRUE,37
+cognitivecomputations/dolphin-mistral-24b-venice-edition,Dolphin Mistral Uncensored,TRUE,38
+cognitivecomputations/dolphin3.0-mistral-24b,Dolphin 3.0 Mistral,TRUE,39
+tngtech/deepseek-r1t2-chimera,Tngtech Deepseek R1T2 Chimera,TRUE,40
+tngtech/deepseek-r1t-chimera,Tngtech Deepseek R1T Chimera,TRUE,41
+alibaba/tongyi-deepresearch-30b-a3b,Alibaba Tongyi Deepresearch,TRUE,42
+meituan/longcat-flash-chat,Meituan Longcat Flash Chat,TRUE,43
+z-ai/glm-4.5-air,Z-AI Glm 4.5 Air,TRUE,44
+tencent/hunyuan-a13b-instruct,Tencent Hunyuan A13B Instruct,TRUE,45
+shisa-ai/shisa-v2-llama3.3-70b,Shisa V2 Llama 3.3,TRUE,46
+arliai/qwq-32b-arliai-rpr-v1,Qwq 32B Arliai Rpr V1,TRUE,47
+agentica-org/deepcoder-14b-preview,Agentica Deepcoder 14B,TRUE,48
+nousresearch/deephermes-3-llama-3-8b-preview,Deephermes 3 Llama 3 8B,TRUE,49

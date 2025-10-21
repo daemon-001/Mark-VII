@@ -8,10 +8,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="PLACEHOLDER" />
-                  <option name="mobileSdkAppId" value="" />
-                  <option name="projectId" value="" />
-                  <option name="projectNumber" value="" />
+                  <option name="appId" value="com.daemon.markvii" />
+                  <option name="mobileSdkAppId" value="1:81954501703:android:499b17b3b4f25087f7ed62" />
+                  <option name="projectId" value="mark-vii-2c04f" />
+                  <option name="projectNumber" value="81954501703" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />

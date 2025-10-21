@@ -44,17 +44,46 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-//    First auto response
-    fun onStart(event: ChatUiEvent) {
-        when (event) {
-            is ChatUiEvent.SendPrompt -> {
-                getResponse(event.prompt)
-            }
-            is ChatUiEvent.UpdatePrompt -> {
-                _chatState.update {
-                    it.copy(prompt = event.newPrompt)
+//    Show welcome guide without making API call
+    fun showWelcomeGuide() {
+        val welcomeMessage = """
+            👋 Welcome to Mark VII!
+            
+            🚀 Quick Start Guide:
+            
+            1️⃣ SELECT MODEL
+               • Tap the model dropdown at the top
+               • Choose from multiple available models.
+            
+            3️⃣ START CHATTING
+               • Type your message in the text box
+               • Tap the send button (✈️)
+               • Get instant AI responses
+            
+            4️⃣ IMAGE UNDERSTANDING
+               • Tap the 📷 icon to attach images
+               • Ask questions about the image
+               • AI will analyze and respond
+            
+            💡 Tips:
+               • Different models have different strengths
+            
+            ✨ Ready to start? Just type your first message!
+        """.trimIndent()
+        
+        val welcomeChat = Chat(
+            prompt = welcomeMessage,
+            bitmap = null,
+            isFromUser = false,
+            modelUsed = "" // Welcome guide has no model
+        )
+        
+        _chatState.update {
+            it.copy(
+                chatList = it.chatList.toMutableList().apply {
+                    add(0, welcomeChat)
                 }
-            }
+            )
         }
     }
 
