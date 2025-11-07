@@ -1,13 +1,16 @@
 
+
 package com.daemon.markvii
 
 /**
  * @author Nitesh
  */
 
+import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
+import android.speech.RecognizerIntent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -15,30 +18,49 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AddAPhoto
+import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Send
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
+import androidx.compose.material3.ripple
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -51,8 +73,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -60,6 +85,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
@@ -91,6 +117,7 @@ import kotlinx.coroutines.flow.update
 class MainActivity : ComponentActivity() {
 
     private val uriState = MutableStateFlow("")
+    private val voiceInputState = MutableStateFlow("")
 
     private val imagePicker =
         registerForActivityResult<PickVisualMediaRequest, Uri?>(
@@ -98,6 +125,19 @@ class MainActivity : ComponentActivity() {
         ) { uri ->
             uri?.let {
                 uriState.update { uri.toString() }
+            }
+        }
+
+    private val voiceInputLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            spokenText?.let {
+                if (it.isNotEmpty()) {
+                    voiceInputState.update { text -> it[0] }
+                }
+            }
             }
         }
 
@@ -137,11 +177,16 @@ class MainActivity : ComponentActivity() {
                                         .fillMaxWidth()
                                         .background(MaterialTheme.colorScheme.primary)
                                         .height(50.dp)
-                                        .padding(start = 15.dp, end = 5.dp)
+                                        .padding(start = 20.dp, end = 5.dp)
                                 ) {
-                                    DropDownDemo() // nlp model selector dropdown menu ui
-
-//                                        Spacer(modifier = Modifier.width(8.dp)) // makes blank space
+                                    // Mark VII header title
+                                    Text(
+                                        text = "Mark VII",
+                                        fontSize = 22.sp,
+                                        fontFamily = FontFamily(Font(R.font.typographica)),
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.align(Alignment.CenterStart)
+                                    )
 
 //                                      info tab start icon at top bar
                                     val composition by rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.info_card))
@@ -200,11 +245,48 @@ class MainActivity : ComponentActivity() {
         val chaViewModel = viewModel<ChatViewModel>()
         val chatState = chaViewModel.chatState.collectAsState().value
         val bitmap = getBitmap()
+        val voiceInput = voiceInputState.collectAsState().value
+        val context = LocalContext.current
+        
+        // Model selector state for prompt box
+        val isPromptDropDownExpanded = remember { mutableStateOf(false) }
+        val promptItemPosition = remember { mutableStateOf(0) }
+        
+        // Observe Firebase models and API key
+        val firebaseModels by FirebaseConfigManager.models.collectAsState()
+        val firebaseApiKey by FirebaseConfigManager.apiKey.collectAsState()
+        
+        val currentModels = if (firebaseModels.isNotEmpty()) {
+            firebaseModels.map { ModelInfo(it.displayName, it.apiModel, it.isAvailable) }
+        } else {
+            emptyList()
+        }
+
+        // Update API key when Firebase data changes
+        LaunchedEffect(firebaseApiKey) {
+            if (firebaseApiKey.isNotEmpty()) {
+                ChatData.updateApiKey(firebaseApiKey)
+            }
+        }
+        
+        // Set initial model when models load
+        LaunchedEffect(currentModels) {
+            if (currentModels.isNotEmpty() && promptItemPosition.value < currentModels.size) {
+                ChatData.selected_model = currentModels[promptItemPosition.value].apiModel
+            }
+        }
+
+        // Update prompt when voice input is received
+        LaunchedEffect(voiceInput) {
+            if (voiceInput.isNotEmpty()) {
+                chaViewModel.onEvent(ChatUiEvent.UpdatePrompt(voiceInput))
+                voiceInputState.update { "" }
+            }
+        }
 
 
         BigHi() // chat screen background ui function
         Column(
-
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = paddingValues.calculateTopPadding()),
@@ -230,79 +312,381 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            Row(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
-
-
-                Column {
-//                    picked image display
-                    bitmap?.let {
+//                ================ Picked Image Display with Pin Icon ================
+                bitmap?.let {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(0xFF2C2C2E))
+                            .border(
+                                width = 1.dp,
+                                color = Color(0xFF3A3A3C),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                            .padding(10.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            // Pin icon
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_pin),
+                                contentDescription = "Pinned image",
+                                tint = Color(0xFFAAAAAA),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            
+                            // Thumbnail image
                         Image(
                             modifier = Modifier
-                                .padding(bottom = 10.dp, start = 10.dp)
-                                .size(58.dp)
-                                .clip(CircleShape),
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(8.dp)),
                             contentDescription = "picked image",
                             contentScale = ContentScale.Crop,
                             bitmap = it.asImageBitmap()
                         )
+                            
+                            // Image text
+                            Text(
+                                text = "Image attached",
+                                color = Color(0xFFE5E5E5),
+                                fontSize = 14.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                            
+                            // Remove button
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = "Remove image",
+                                tint = Color(0xFFAAAAAA),
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clickable {
+                                        uriState.update { "" }
+                                    }
+                            )
+                        }
                     }
                 }
-// ###################################### Text Field ##################################
+
+// ================ Dark Minimalist Input Box (Gemini Style) ================
+                Column {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .shadow(
+                                elevation = 8.dp,
+                                shape = RoundedCornerShape(28.dp),
+                                ambientColor = Color.Black.copy(alpha = 0.4f),
+                                spotColor = Color.Black.copy(alpha = 0.4f)
+                            )
+                            .clip(RoundedCornerShape(28.dp))
+                            .background(Color(0xFF2C2C2E))
+                            .border(
+                                width = 1.dp,
+                                color = Color(0xFF3A3A3C),
+                                shape = RoundedCornerShape(28.dp)
+                            )
+                    ) {
+                        Column {
+                            // Text input field at top (multiline, expands upward)
                 TextField(
                     modifier = Modifier
-                        .weight(1f)
-                        .padding(bottom = 10.dp, start = 10.dp, end = 10.dp)
-                        .clip(shape = CircleShape),
+                                    .fillMaxWidth()
+                                    .padding(0.dp)
+                                    .heightIn(min = 40.dp, max = 150.dp),
                     value = chatState.prompt,
-                    singleLine = true,
+                                singleLine = false,
+                                maxLines = 6,
                     onValueChange = {
                         chaViewModel.onEvent(ChatUiEvent.UpdatePrompt(it))
                     },
                     placeholder = {
-                        Text(text = "Ask anything!")
-                    },
-
-//                    textbox image picker icon
-                    leadingIcon = {
-                        val composition by rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.imgpckr))
-                        LottieAnimation(
-                            composition = composition,
-                            modifier = Modifier
-                                .size(50.dp)
-                                .clickable {
-                                    imagePicker.launch(PickVisualMediaRequest
-                                            .Builder()
-                                            .setMediaType(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                            .build()
+                                    Text(
+                                        text = "Ask Mark VII...",
+                                        fontSize = 14.sp,
+                                        color = Color(0xFF8E8E93)
                                     )
                                 },
-                            iterations = LottieConstants.IterateForever,
-                            // progress = { }
-                        )
-                    },
+                                textStyle = androidx.compose.ui.text.TextStyle(
+                                    fontSize = 15.sp,
+                                    color = Color(0xFFE5E5E5),
+                                    lineHeight = 20.sp
+                                ),
+                    colors = TextFieldDefaults.colors(
+                                    focusedTextColor = Color(0xFFE5E5E5),
+                                    unfocusedTextColor = Color(0xFFE5E5E5),
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    disabledContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                                    disabledIndicatorColor = Color.Transparent,
+                                    cursorColor = Color(0xFFE5E5E5),
+                                    focusedPlaceholderColor = Color(0xFF8E8E93),
+                                    unfocusedPlaceholderColor = Color(0xFF8E8E93)
+                                )
+                            )
+                            
+                            // Bottom row: Icons + Model Selector + Mic + Send button
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 16.dp, end = 12.dp, bottom = 8.dp, top = 0.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
 
-//                    textbox send icon
-                    trailingIcon = {
-                        Alignment.Bottom
-                        val composition by rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.sendair))
-                        LottieAnimation(
-                            composition = composition,
-                            modifier = Modifier
-                                .size(60.dp)
-                                .clickable {
-//                            Toast.makeText(context, "Responding...", Toast.LENGTH_SHORT).show()
-                                    chaViewModel.onEvent(ChatUiEvent.SendPrompt(chatState.prompt, bitmap))
-                                    uriState.update { "" }
-                                },
-                            iterations = LottieConstants.IterateForever,
-                            // progress = { }
-                        )
-                    },
-                )
+                                
+                                // Model selector (clickable text with dropdown icon)
+                                Box(
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable(
+                                                interactionSource = remember { MutableInteractionSource() },
+                                                indication = ripple(
+                                                    color = Color.White.copy(alpha = 0.3f)
+                                                )
+                                            ) { 
+                                                isPromptDropDownExpanded.value = true 
+                                            }
+                                            .padding(vertical = 8.dp, horizontal = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = if (currentModels.isNotEmpty() && promptItemPosition.value < currentModels.size) {
+                                                currentModels[promptItemPosition.value].displayName
+                                            } else {
+                                                "Model Selector"
+                                            },
+                                            fontSize = 13.sp,
+                                            color = Color(0xFFE5E5E5),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            lineHeight = 13.sp,
+                                            maxLines = 1,
+                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        )
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.drop_down_ic),
+                                            contentDescription = "Select model",
+                                            tint = Color(0xFFE5E5E5),
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                    
+                                    // Dropdown menu - Aesthetic design
+                                    Box(
+                                        modifier = Modifier
+                                            .width(280.dp)
+                                            .shadow(
+                                                elevation = 12.dp,
+                                                shape = RoundedCornerShape(20.dp),
+                                                ambientColor = Color.Black.copy(alpha = 0.5f),
+                                                spotColor = Color.Black.copy(alpha = 0.5f)
+                                            )
+                                            .clip(RoundedCornerShape(20.dp))
+                                            .background(Color(0xFF2C2C2E))
+                                            .border(
+                                                width = 1.dp,
+                                                color = Color(0xFF3A3A3C),
+                                                shape = RoundedCornerShape(20.dp)
+                                            )
+                                    ) {
+                                        DropdownMenu(
+                                            expanded = isPromptDropDownExpanded.value,
+                                            onDismissRequest = { isPromptDropDownExpanded.value = false },
+                                            modifier = Modifier
+                                                .width(280.dp)
+                                                .heightIn(max = 400.dp)
+                                                .background(Color(0xFF2C2C2E)),
+                                            shape = RoundedCornerShape(20.dp),
+                                            containerColor = Color(0xFF2C2C2E)
+                                        ) {
+                                        if (currentModels.isEmpty()) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 16.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = "No models available",
+                                                    color = Color(0xFF8E8E93),
+                                                    fontSize = 14.sp,
+                                                    style = MaterialTheme.typography.bodyMedium
+                                                )
+                                            }
+                                        } else {
+                                            currentModels.forEachIndexed { index, model ->
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                                ) {
+                                                    DropdownMenuItem(
+                                                        text = {
+                                                            Row(
+                                                                modifier = Modifier.fillMaxWidth(),
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
+                                                                // Model indicator dot
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .size(6.dp)
+                                                                        .clip(CircleShape)
+                                                                        .background(
+                                                                            if (model.isAvailable) 
+                                                                                Color(0xFF00D9FF) 
+                                                                            else 
+                                                                                Color(0xFF8E8E93)
+                                                                        )
+                                                                )
+                                                                
+                                                                Spacer(modifier = Modifier.width(12.dp))
+                                                                
+                                                                Text(
+                                                                    text = model.displayName,
+                                                                    color = if (promptItemPosition.value == index) 
+                                                                        Color(0xFF00D9FF) 
+                                                                    else 
+                                                                        Color(0xFFE5E5E5),
+                                                                    fontSize = 15.sp,
+                                                                    style = MaterialTheme.typography.bodyMedium,
+                                                                    fontWeight = if (promptItemPosition.value == index) 
+                                                                        FontWeight.SemiBold 
+                                                                    else 
+                                                                        FontWeight.Normal
+                                                                )
+                                                            }
+                                                        },
+                                                        onClick = {
+                                                            isPromptDropDownExpanded.value = false
+                                                            promptItemPosition.value = index
+                                                            ChatData.selected_model = model.apiModel
+                                                            
+                                                            if (!model.isAvailable) {
+                                                                Toast.makeText(
+                                                                    context,
+                                                                    "Model temporarily unavailable",
+                                                                    Toast.LENGTH_SHORT
+                                                                ).show()
+                                                            }
+                                                        },
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .clip(RoundedCornerShape(12.dp))
+                                                            .background(
+                                                                if (promptItemPosition.value == index)
+                                                                    Color(0xFF00D9FF).copy(alpha = 0.1f)
+                                                                else
+                                                                    Color(0xFF2C2C2E)
+                                                            ),
+                                                        contentPadding = PaddingValues(
+                                                            horizontal = 12.dp,
+                                                            vertical = 12.dp
+                                                        ),
+                                                        colors = MenuDefaults.itemColors(
+                                                            textColor = Color(0xFFE5E5E5),
+                                                            leadingIconColor = Color(0xFFE5E5E5),
+                                                            trailingIconColor = Color(0xFFE5E5E5),
+                                                            disabledTextColor = Color(0xFF8E8E93),
+                                                            disabledLeadingIconColor = Color(0xFF8E8E93),
+                                                            disabledTrailingIconColor = Color(0xFF8E8E93)
+                                                        )
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        }
+                                    }
+                                }
+                                
+                                // Microphone icon (moved to right)
+                                IconButton(
+                                    onClick = {
+                                        try {
+                                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                                putExtra(
+                                                    RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                                                    RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                                                )
+                                                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
+                                                putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
+                                            }
+                                            voiceInputLauncher.launch(intent)
+                                        } catch (e: Exception) {
+                                            Toast.makeText(
+                                                context,
+                                                "Voice input not available",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    },
+                                    modifier = Modifier.size(40.dp)
+                                ) {
+                        Icon(
+                                        imageVector = Icons.Rounded.Mic,
+                                        contentDescription = "Voice input",
+                                        tint = Color(0xFFE5E5E5),
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                                
+                                // Send button
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (chatState.prompt.isNotEmpty() || bitmap != null) {
+                                                Color(0xFFE5E5E5)
+                                            } else {
+                                                Color(0xFF3A3A3C)
+                                            }
+                                        )
+                                        .clickable(
+                                            enabled = chatState.prompt.isNotEmpty() || bitmap != null
+                                        ) {
+                                            chaViewModel.onEvent(
+                                                ChatUiEvent.SendPrompt(
+                                                    chatState.prompt,
+                                                    bitmap
+                                                )
+                                            )
+                                            uriState.update { "" }
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                        Icon(
+                                        imageVector = Icons.Rounded.ArrowUpward,
+                            contentDescription = "Send",
+                                        tint = if (chatState.prompt.isNotEmpty() || bitmap != null) {
+                                            Color(0xFF1C1C1E)
+                                        } else {
+                                            Color(0xFF8E8E93)
+                                        },
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
         }
@@ -484,7 +868,7 @@ class MainActivity : ComponentActivity() {
                         if (currentModels.isNotEmpty() && itemPosition.value < currentModels.size) {
                             Text(
                                 text = currentModels[itemPosition.value].displayName,
-                                fontSize = 20.sp,
+                                fontSize = 18.sp,
                                 fontFamily = FontFamily(Font(R.font.typographica)),
                                 color = MaterialTheme.colorScheme.onPrimary
                             )
@@ -600,9 +984,6 @@ class MainActivity : ComponentActivity() {
 
 
 }
-
-
-
 
 
 
