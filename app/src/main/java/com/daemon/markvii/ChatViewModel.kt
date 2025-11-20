@@ -73,19 +73,20 @@ class ChatViewModel : ViewModel() {
             
             1️⃣ SELECT MODEL
                • Tap the model dropdown at the top
-               • Choose from multiple available models.
+               • Choose from FREE AI models powered by OpenRouter
             
-            3️⃣ START CHATTING
+            2️⃣ START CHATTING
                • Type your message in the text box
                • Tap the send button (✈️)
                • Get instant AI responses
             
-            4️⃣ IMAGE UNDERSTANDING
+            3️⃣ IMAGE UNDERSTANDING
                • Tap the 📷 icon to attach images
                • Ask questions about the image
                • AI will analyze and respond
             
             💡 Tips:
+               • All models are FREE to use
                • Different models have different strengths
             
             ✨ Ready to start? Just type your first message!
@@ -170,6 +171,14 @@ class ChatViewModel : ViewModel() {
         val errorCode = if (parts.size == 2) parts[0] else "UNKNOWN_ERROR"
         val errorDetails = if (parts.size == 2) parts[1] else errorMessage
         
+        // Use only the API error message, not the stack trace
+        val apiErrorLog = buildString {
+            appendLine("Error Code: $errorCode")
+            appendLine("")
+            appendLine("Details:")
+            appendLine(errorDetails)
+        }
+        
         val (title, mainMessage, isRetryable) = when (errorCode) {
             "API_KEY_MISSING" -> Triple(
                 "Configuration Error",
@@ -218,10 +227,11 @@ class ChatViewModel : ViewModel() {
                 error = ErrorInfo(
                     title = title,
                     mainMessage = mainMessage,
-                    fullDetails = errorDetails,
+                    fullDetails = apiErrorLog,
                     isRetryable = isRetryable,
                     lastPrompt = prompt,
-                    lastBitmap = bitmap
+                    lastBitmap = bitmap,
+                    rawException = errorDetails
                 )
             )
         }

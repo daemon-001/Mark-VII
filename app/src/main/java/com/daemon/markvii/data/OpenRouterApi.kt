@@ -5,6 +5,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
+import retrofit2.http.GET
 import retrofit2.http.Headers
 import retrofit2.http.POST
 import java.util.concurrent.TimeUnit
@@ -58,11 +59,50 @@ data class ErrorResponse(
 )
 
 /**
+ * Models API Response Data Models
+ */
+data class OpenRouterModelsResponse(
+    val data: List<ModelData>?
+)
+
+data class ModelData(
+    val id: String,
+    val name: String?,
+    val description: String?,
+    val pricing: ModelPricing?,
+    val context_length: Int?,
+    val architecture: ModelArchitecture?,
+    val top_provider: ModelProvider?
+)
+
+data class ModelPricing(
+    val prompt: String?,
+    val completion: String?,
+    val request: String?,
+    val image: String?
+)
+
+data class ModelArchitecture(
+    val modality: String?,
+    val tokenizer: String?,
+    val instruct_type: String?
+)
+
+data class ModelProvider(
+    val context_length: Int?,
+    val max_completion_tokens: Int?,
+    val is_moderated: Boolean?
+)
+
+/**
  * Retrofit API Interface
  */
 interface OpenRouterApiService {
     @POST("chat/completions")
     suspend fun chatCompletion(@Body request: OpenRouterRequest): OpenRouterResponse
+    
+    @GET("models")
+    suspend fun getModels(): OpenRouterModelsResponse
 }
 
 /**
@@ -87,8 +127,14 @@ object OpenRouterClient {
     
     private val okHttpClient = OkHttpClient.Builder()
         .addInterceptor { chain ->
-            val request = chain.request().newBuilder()
-                .addHeader("Authorization", "Bearer $apiKey")
+            val originalRequest = chain.request()
+            val request = originalRequest.newBuilder()
+                .apply {
+                    // Only add Authorization header if API key exists and not calling /models endpoint
+                    if (apiKey.isNotEmpty() && !originalRequest.url.encodedPath.endsWith("/models")) {
+                        addHeader("Authorization", "Bearer $apiKey")
+                    }
+                }
                 .addHeader("HTTP-Referer", "https://github.com/daemon-001/Mark-VII")
                 .addHeader("X-Title", "Mark-VII")
                 .addHeader("Content-Type", "application/json")

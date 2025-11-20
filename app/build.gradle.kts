@@ -94,6 +94,9 @@ dependencies {
     implementation("com.google.firebase:firebase-database-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-analytics-ktx")
+    
+    // Markdown rendering for chat responses
+    implementation("com.github.jeziellago:compose-markdown:0.5.4")
 }
 
 

@@ -11,6 +11,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.speech.RecognizerIntent
+import android.speech.tts.TextToSpeech
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -38,9 +39,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AddAPhoto
@@ -50,6 +53,10 @@ import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -115,6 +122,7 @@ import com.daemon.markvii.data.FirebaseModelInfo
 import com.daemon.markvii.ui.theme.MarkVIITheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import dev.jeziellago.compose.markdowntext.MarkdownText
 
 
 
@@ -123,6 +131,9 @@ class MainActivity : ComponentActivity() {
 
     private val uriState = MutableStateFlow("")
     private val voiceInputState = MutableStateFlow("")
+    
+    private var textToSpeech: TextToSpeech? = null
+    private var isTtsInitialized = false
 
     private val imagePicker =
         registerForActivityResult<PickVisualMediaRequest, Uri?>(
@@ -151,6 +162,15 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 //        Thread.sleep(1000) // splash screen delay
         installSplashScreen()  // splash screen ui
+        
+        // Initialize TextToSpeech
+        textToSpeech = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                isTtsInitialized = true
+                textToSpeech?.language = java.util.Locale.US
+            }
+        }
+        
         setContent {
 
             MarkVIITheme {
@@ -158,7 +178,7 @@ class MainActivity : ComponentActivity() {
                 // A surface container using the 'background' color from the theme
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = Color.Gray
+                    color = Color.Black
 //                    color = MaterialTheme.colorScheme.background
                 )
 
@@ -237,6 +257,13 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    
+    override fun onDestroy() {
+        // Shutdown TextToSpeech to free resources
+        textToSpeech?.stop()
+        textToSpeech?.shutdown()
+        super.onDestroy()
+    }
 
     @Composable
     fun ErrorDialog(
@@ -287,6 +314,7 @@ class MainActivity : ComponentActivity() {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .heightIn(max = 300.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(Color(0xFF1C1C1E))
                                 .border(
@@ -294,15 +322,18 @@ class MainActivity : ComponentActivity() {
                                     color = Color(0xFF3A3A3C),
                                     shape = RoundedCornerShape(12.dp)
                                 )
-                                .padding(12.dp)
                         ) {
+                            val scrollState = rememberScrollState()
                             SelectionContainer {
                                 Text(
                                     text = errorDetails,
                                     style = MaterialTheme.typography.bodySmall,
                                     fontSize = 13.sp,
                                     color = Color(0xFFAAAAAA),
-                                    lineHeight = 18.sp
+                                    lineHeight = 18.sp,
+                                    modifier = Modifier
+                                        .verticalScroll(scrollState)
+                                        .padding(12.dp)
                                 )
                             }
                         }
@@ -355,18 +386,43 @@ class MainActivity : ComponentActivity() {
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
         
-        // Observe Firebase config state
-        val configState by FirebaseConfigManager.configState.collectAsState()
-        var showFirebaseError by remember { mutableStateOf(false) }
-        var firebaseErrorMessage by remember { mutableStateOf("") }
+        // State for loading free models from OpenRouter
+        var isLoadingModels by remember { mutableStateOf(false) }
+        var freeModels by remember { mutableStateOf<List<ModelInfo>>(emptyList()) }
+        var modelsLoadError by remember { mutableStateOf<String?>(null) }
         
-        // Initialize Firebase on first composition
+        // Observe Firebase API key
+        val firebaseApiKey by FirebaseConfigManager.apiKey.collectAsState()
+        
+        // Initialize Firebase to get API key
         LaunchedEffect(Unit) {
             FirebaseConfigManager.initialize()
         }
         
-        // Show loading popup while Firebase is loading
-        if (configState is FirebaseConfigManager.ConfigState.Loading) {
+        // Update API key when Firebase data changes
+        LaunchedEffect(firebaseApiKey) {
+            if (firebaseApiKey.isNotEmpty()) {
+                ChatData.updateApiKey(firebaseApiKey)
+            }
+        }
+        
+        // Load free models from OpenRouter on first composition
+        LaunchedEffect(Unit) {
+            isLoadingModels = true
+            try {
+                freeModels = ChatData.fetchFreeModels()
+                if (freeModels.isEmpty()) {
+                    modelsLoadError = "No free models available"
+                }
+            } catch (e: Exception) {
+                modelsLoadError = "Failed to load models: ${e.message}"
+            } finally {
+                isLoadingModels = false
+            }
+        }
+        
+        // Show loading popup while models are loading
+        if (isLoadingModels) {
             AlertDialog(
                 onDismissRequest = { },
                 containerColor = Color(0xFF2C2C2E),
@@ -384,7 +440,7 @@ class MainActivity : ComponentActivity() {
                             strokeWidth = 4.dp
                         )
                         Text(
-                            text = "Loading models...",
+                            text = "Loading free models...",
                             fontSize = 16.sp,
                             color = Color(0xFFE5E5E5),
                             fontFamily = FontFamily(Font(R.font.typographica))
@@ -393,38 +449,6 @@ class MainActivity : ComponentActivity() {
                 },
                 confirmButton = { }
             )
-        }
-        
-        // Show Firebase error dialog
-        if (showFirebaseError) {
-            ErrorDialog(
-                errorTitle = "Configuration Error",
-                errorMessage = "Failed to load Firebase configuration",
-                errorDetails = firebaseErrorMessage,
-                isRetryable = true,
-                onDismiss = { 
-                    showFirebaseError = false
-                },
-                onRetry = {
-                    scope.launch {
-                        FirebaseConfigManager.initialize()
-                    }
-                }
-            )
-        }
-        
-        // Monitor config state for errors
-        LaunchedEffect(configState) {
-            when (configState) {
-                is FirebaseConfigManager.ConfigState.Error -> {
-                    val error = configState as FirebaseConfigManager.ConfigState.Error
-                    firebaseErrorMessage = error.message
-                    showFirebaseError = true
-                }
-                else -> {
-                    showFirebaseError = false
-                }
-            }
         }
         
         // Observe error state from ViewModel
@@ -459,22 +483,7 @@ class MainActivity : ComponentActivity() {
         val isPromptDropDownExpanded = remember { mutableStateOf(false) }
         val promptItemPosition = remember { mutableStateOf(0) }
         
-        // Observe Firebase models and API key
-        val firebaseModels by FirebaseConfigManager.models.collectAsState()
-        val firebaseApiKey by FirebaseConfigManager.apiKey.collectAsState()
-        
-        val currentModels = if (firebaseModels.isNotEmpty()) {
-            firebaseModels.map { ModelInfo(it.displayName, it.apiModel, it.isAvailable) }
-        } else {
-            emptyList()
-        }
-
-        // Update API key when Firebase data changes
-        LaunchedEffect(firebaseApiKey) {
-            if (firebaseApiKey.isNotEmpty()) {
-                ChatData.updateApiKey(firebaseApiKey)
-            }
-        }
+        val currentModels = freeModels
         
         // Set initial model when models load
         LaunchedEffect(currentModels) {
@@ -493,42 +502,81 @@ class MainActivity : ComponentActivity() {
 
 
         BigHi() // chat screen background ui function
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = paddingValues.calculateTopPadding()),
-            verticalArrangement = Arrangement.Bottom
+                .padding(top = paddingValues.calculateTopPadding())
         ) {
-
-//            prompt entry textbox starts here
-            LazyColumn(
+//            Chat messages list - extends to bottom of screen
+            Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp),
-                reverseLayout = true,
+                    .fillMaxSize()
             ) {
-                // Show typing indicator when generating response
-                if (chatState.isGeneratingResponse) {
-                    item {
-                        TypingIndicator()
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 8.dp),
+                    reverseLayout = true,
+                    contentPadding = PaddingValues(bottom = 200.dp) // Space for prompt box
+                ) {
+                    // Show typing indicator when generating response
+                    if (chatState.isGeneratingResponse) {
+                        item {
+                            TypingIndicator()
+                        }
+                    }
+                    
+                    itemsIndexed(chatState.chatList) { index, chat ->
+                        if (chat.isFromUser) {
+                            UserChatItem(
+                                prompt = chat.prompt, bitmap = chat.bitmap
+                            )
+                        } else {
+                            // Get the previous user message for retry
+                            val previousUserChat = if (index < chatState.chatList.size - 1) {
+                                chatState.chatList.getOrNull(index + 1)
+                            } else null
+                            
+                            ModelChatItem(
+                                response = chat.prompt,
+                                modelUsed = chat.modelUsed,
+                                userPrompt = previousUserChat?.prompt ?: "",
+                                userBitmap = previousUserChat?.bitmap,
+                                onRetry = { newModel ->
+                                    chaViewModel.onEvent(
+                                        ChatUiEvent.RetryPrompt(
+                                            previousUserChat?.prompt ?: "",
+                                            previousUserChat?.bitmap
+                                        )
+                                    )
+                                }
+                            )
+                        }
                     }
                 }
                 
-                itemsIndexed(chatState.chatList) { index, chat ->
-                    if (chat.isFromUser) {
-                        UserChatItem(
-                            prompt = chat.prompt, bitmap = chat.bitmap
+                // Fade effect at bottom
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp)
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Black
+                                )
+                            )
                         )
-                    } else {
-                        ModelChatItem(response = chat.prompt, modelUsed = chat.modelUsed)
-                    }
-                }
+                )
             }
 
+//            Prompt box - overlays at bottom
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
                     .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
 //                ================ Picked Image Display with Pin Icon ================
@@ -902,7 +950,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
-
         }
 
     }
@@ -954,7 +1001,7 @@ class MainActivity : ComponentActivity() {
         SelectionContainer() {
             Column(
                 modifier = Modifier
-                    .padding(start = 50.dp, top = 8.dp, bottom = 8.dp)
+                    .padding(start = 50.dp, top = 8.dp, bottom = 8.dp, end = 8.dp)
                     .fillMaxWidth(),
                 horizontalAlignment = Alignment.End
 
@@ -978,12 +1025,12 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier
 //                        .fillMaxWidth()
                         .clip(RoundedCornerShape(20.dp))
-                        .background(MaterialTheme.colorScheme.primary)
+                        .background(Color(0xFF3E3E3E))
                         .padding(start = 15.dp, end = 15.dp, top = 10.dp, bottom = 10.dp),
 //                    textAlign = TextAlign.Right,
                     text = prompt,
                     fontSize = 17.sp,
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = Color.White,
                 )
 
             }
@@ -993,7 +1040,23 @@ class MainActivity : ComponentActivity() {
 
 //    model chat text bubble
     @Composable
-    fun ModelChatItem(response: String, modelUsed: String = "") {
+    fun ModelChatItem(
+        response: String,
+        modelUsed: String = "",
+        userPrompt: String = "",
+        userBitmap: Bitmap? = null,
+        onRetry: (String) -> Unit = {}
+    ) {
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+        var showModelSelector by remember { mutableStateOf(false) }
+        
+        // Get current free models
+        var freeModels by remember { mutableStateOf<List<ModelInfo>>(emptyList()) }
+        LaunchedEffect(Unit) {
+            freeModels = ChatData.fetchFreeModels()
+        }
+        
         // Extract brand name from model (e.g., "deepseek/deepseek-chat-v3.1" -> "Deepseek")
         val brandName = if (modelUsed.isNotEmpty()) {
             val brand = modelUsed.substringBefore("/")
@@ -1009,34 +1072,244 @@ class MainActivity : ComponentActivity() {
             "Mark VII"
         }
         
-        SelectionContainer() {
-            Column(
-                modifier = Modifier.padding(end = 50.dp, top = 8.dp, bottom = 8.dp)
-
-
-            ) {
-//                model response text display
+        Column(
+            modifier = Modifier.padding(end = 8.dp, top = 8.dp, bottom = 8.dp)
+        ) {
+//            model response text display with Markdown support
+            SelectionContainer() {
                 Box(
                     modifier = Modifier
-//                        .fillMaxWidth()
                         .clip(RoundedCornerShape(20.dp))
                         .background(Color.Black)
                         .padding(16.dp),
                 ){
-                    Text(
-                        text = headerText,
-                        fontSize = 16.sp,
-                        fontFamily = FontFamily(Font(R.font.typographica)),
-                        color = Color.White
-                    )
-                    Text(
-                        text = "\n\n" + response,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontSize = 16.sp,
-                        color = Color.White
+                    Column {
+                        Text(
+                            text = headerText,
+                            fontSize = 18.sp,
+                            fontFamily = FontFamily(Font(R.font.typographica)),
+                            color = Color.White
+                        )
+                        if (modelUsed.isNotEmpty()) {
+                            Text(
+                                text = modelUsed.replace(":free", ""),
+                                fontSize = 12.sp,
+                                color = Color(0xFF8E8E93),
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        MarkdownText(
+                            markdown = response,
+                            color = Color.White,
+                            modifier = Modifier.fillMaxWidth(),
+                            fontSize = 16.sp,
+                            lineHeight = 22.sp
+                        )
+                    }
+                }
+            }
+            
+            // Action buttons row
+            Row(
+                modifier = Modifier
+                    .padding(start = 8.dp, top = 4.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Copy button
+                IconButton(
+                    onClick = {
+                        // Remove markdown formatting before copying
+                        val cleanText = response
+                            .replace("```[a-zA-Z]*\\n".toRegex(), "")
+                            .replace("```", "")
+                            .replace("**", "")
+                            .replace("*", "")
+                            .replace("##", "")
+                            .replace("#", "")
+                            .replace("`", "")
+                            .replace("---", "")
+                            .replace("- ", "• ")
+                            .trim()
+                        
+                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        val clip = android.content.ClipData.newPlainText("response", cleanText)
+                        clipboard.setPrimaryClip(clip)
+                        Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.ContentCopy,
+                        contentDescription = "Copy",
+                        tint = Color(0xFF8E8E93),
+                        modifier = Modifier.size(18.dp)
                     )
                 }
-
+                
+                // Speak button
+                IconButton(
+                    onClick = {
+                        if (isTtsInitialized && textToSpeech != null) {
+                            if (textToSpeech!!.isSpeaking) {
+                                textToSpeech?.stop()
+                            } else {
+                                // Remove markdown formatting for better speech
+                                val cleanText = response
+                                    .replace("```[a-zA-Z]*\\n".toRegex(), "")
+                                    .replace("```", "")
+                                    .replace("**", "")
+                                    .replace("*", "")
+                                    .replace("#", "")
+                                    .replace("`", "")
+                                    .trim()
+                                
+                                textToSpeech?.speak(
+                                    cleanText,
+                                    TextToSpeech.QUEUE_FLUSH,
+                                    null,
+                                    null
+                                )
+                                Toast.makeText(context, "Speaking...", Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            Toast.makeText(context, "Text-to-speech not ready", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.VolumeUp,
+                        contentDescription = "Speak",
+                        tint = Color(0xFF8E8E93),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                
+                // Retry button with model selector
+                IconButton(
+                    onClick = {
+                        showModelSelector = true
+                    },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Refresh,
+                        contentDescription = "Retry with different model",
+                        tint = Color(0xFF8E8E93),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                
+                // Share button
+                IconButton(
+                    onClick = {
+                        val shareIntent = Intent().apply {
+                            action = Intent.ACTION_SEND
+                            putExtra(Intent.EXTRA_TEXT, response)
+                            type = "text/plain"
+                        }
+                        context.startActivity(Intent.createChooser(shareIntent, "Share response"))
+                    },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Share,
+                        contentDescription = "Share",
+                        tint = Color(0xFF8E8E93),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            
+            // Model selector dialog for retry
+            if (showModelSelector) {
+                AlertDialog(
+                    onDismissRequest = { showModelSelector = false },
+                    containerColor = Color(0xFF2C2C2E),
+                    shape = RoundedCornerShape(20.dp),
+                    title = {
+                        Text(
+                            text = "Retry with Model",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFE5E5E5)
+                        )
+                    },
+                    text = {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 400.dp)
+                        ) {
+                            if (freeModels.isEmpty()) {
+                                item {
+                                    Text(
+                                        text = "Loading models...",
+                                        color = Color(0xFF8E8E93),
+                                        modifier = Modifier.padding(16.dp)
+                                    )
+                                }
+                            } else {
+                                itemsIndexed(freeModels) { index, model ->
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(
+                                                if (model.apiModel == modelUsed)
+                                                    Color(0xFF00D9FF).copy(alpha = 0.1f)
+                                                else
+                                                    Color.Transparent
+                                            )
+                                            .clickable {
+                                                ChatData.selected_model = model.apiModel
+                                                showModelSelector = false
+                                                onRetry(model.apiModel)
+                                            }
+                                            .padding(12.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(6.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(0xFF00D9FF))
+                                            )
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Text(
+                                                text = model.displayName,
+                                                color = if (model.apiModel == modelUsed)
+                                                    Color(0xFF00D9FF)
+                                                else
+                                                    Color(0xFFE5E5E5),
+                                                fontSize = 15.sp,
+                                                fontWeight = if (model.apiModel == modelUsed)
+                                                    FontWeight.SemiBold
+                                                else
+                                                    FontWeight.Normal
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = { showModelSelector = false },
+                            colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                                contentColor = Color(0xFF8E8E93)
+                            )
+                        ) {
+                            Text("Cancel", fontSize = 15.sp)
+                        }
+                    }
+                )
             }
         }
     }
@@ -1205,18 +1478,11 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun BigHi(modifier: Modifier = Modifier) {
         Box(
-            modifier.fillMaxSize(),
+            modifier
+                .fillMaxSize()
+                .background(Color.Black),
             contentAlignment = Alignment.Center
         )  {
-
-//            chat screen background wallpaper
-            Image(
-                alignment = Alignment.Center,
-                painter = painterResource(id = R.drawable.background),
-                contentDescription = "Background",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
 
 //            Startup big hi  animation
             val composition by rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.gassist))
@@ -1225,7 +1491,7 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier
                     .size(500.dp)
                     .align(Alignment.Center)
-                    .shadow(300.dp),
+                    .alpha(0.3f)
 //                iterations = LottieConstants.IterateForever // Play in loop
 //                progress = {}
             )

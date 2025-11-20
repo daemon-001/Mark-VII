@@ -48,6 +48,54 @@ object ChatData {
     }
     
     /**
+     * Fetch all available models from OpenRouter
+     * Returns list of models with pricing info
+     */
+    suspend fun fetchAvailableModels(): List<ModelData> {
+        return try {
+            val response = withContext(Dispatchers.IO) {
+                OpenRouterClient.api.getModels()
+            }
+            response.data ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+    
+    /**
+     * Fetch only FREE models from OpenRouter
+     * A model is considered free if prompt and completion prices are "0"
+     */
+    suspend fun fetchFreeModels(): List<ModelInfo> {
+        return try {
+            val allModels = fetchAvailableModels()
+            
+            allModels.filter { model ->
+                val pricing = model.pricing
+                val promptPrice = pricing?.prompt?.toDoubleOrNull() ?: 1.0
+                val completionPrice = pricing?.completion?.toDoubleOrNull() ?: 1.0
+                
+                // Free models have 0 cost for both prompt and completion
+                promptPrice == 0.0 && completionPrice == 0.0
+            }.mapIndexed { index, model ->
+                // Clean up display name but keep original model ID
+                val cleanDisplayName = (model.name ?: model.id)
+                    .replace("(free)", "", ignoreCase = true)
+                    .replace("  ", " ")
+                    .trim()
+                
+                ModelInfo(
+                    displayName = cleanDisplayName,
+                    apiModel = model.id,
+                    isAvailable = true
+                )
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+    
+    /**
      * Convert Bitmap to Base64 string for API
      */
     private fun bitmapToBase64(bitmap: Bitmap): String {
@@ -61,7 +109,7 @@ object ChatData {
         try {
             // Check if API key is loaded
             if (openrouter_api_key.isEmpty()) {
-                throw Exception("API_KEY_MISSING|⚠️ API Key Missing!\n\nPlease configure Firebase:\n1. Add OpenRouter API key to Firebase\n2. Field: openrouterApiKey\n3. Location: app_config/api_keys\n\nSee TROUBLESHOOTING_401_ERROR.md")
+                throw Exception("API_KEY_MISSING|API key is not configured")
             }
             
             // Use a valid default model if none selected
@@ -95,10 +143,10 @@ object ChatData {
             if (response.error != null) {
                 val errorMsg = when {
                     response.error.message.contains("401") || response.error.message.contains("Unauthorized") -> 
-                        "HTTP_401|⚠️ HTTP 401: Unauthorized\n\nYour API key is invalid or missing.\n\nSolution:\n1. Get key from: https://openrouter.ai/keys\n2. Add to Firebase: app_config/api_keys\n3. Field: openrouterApiKey\n\nSee TROUBLESHOOTING_401_ERROR.md"
+                        "HTTP_401|HTTP 401: Unauthorized - API key is invalid or missing"
                     response.error.message.contains("404") || response.error.message.contains("Not Found") ->
-                        "HTTP_404|⚠️ HTTP 404: Model Not Found\n\nThe model '$modelToUse' doesn't exist.\n\nSolution:\n1. Check model name in Firebase\n2. Use valid OpenRouter model\n3. See available models: https://openrouter.ai/models\n\nCommon models:\n- anthropic/claude-3-5-sonnet-20241022\n- openai/gpt-4-turbo\n- openai/gpt-3.5-turbo"
-                    else -> "API_ERROR|Error: ${response.error.message}"
+                        "HTTP_404|HTTP 404: Model Not Found - The model '$modelToUse' doesn't exist"
+                    else -> "API_ERROR|${response.error.message}"
                 }
                 throw Exception(errorMsg)
             }
@@ -122,14 +170,14 @@ object ChatData {
             
             val errorMsg = when {
                 e.message?.contains("401") == true -> 
-                    "HTTP_401|⚠️ HTTP 401: Unauthorized\n\nYour OpenRouter API key is invalid.\n\nSteps to fix:\n1. Go to https://openrouter.ai/keys\n2. Create/copy your API key\n3. Add to Firebase: app_config/api_keys/openrouterApiKey\n4. Restart app\n\nSee TROUBLESHOOTING_401_ERROR.md for details"
+                    "HTTP_401|HTTP 401: Unauthorized - OpenRouter API key is invalid"
                 e.message?.contains("403") == true -> 
-                    "HTTP_403|⚠️ HTTP 403: Forbidden\n\nCheck OpenRouter account credits"
+                    "HTTP_403|HTTP 403: Forbidden - Insufficient credits or permissions"
                 e.message?.contains("404") == true ->
-                    "HTTP_404|⚠️ HTTP 404: Model Not Found\n\nThe selected model doesn't exist on OpenRouter.\n\nSolution:\n1. Update model names in Firebase\n2. Use valid OpenRouter models\n3. Check: https://openrouter.ai/models\n\nWorking models:\n- anthropic/claude-3-5-sonnet-20241022\n- openai/gpt-4-turbo-preview\n- openai/gpt-3.5-turbo"
+                    "HTTP_404|HTTP 404: Model Not Found - The selected model doesn't exist on OpenRouter"
                 e.message?.contains("429") == true -> 
-                    "HTTP_429|⚠️ Rate Limited\n\nToo many requests. Wait a moment and try again."
-                else -> "NETWORK_ERROR|Network Error\n\nCouldn't connect to AI service.\n\nCheck:\n• Internet connection\n• Firebase configuration\n\nDetails: ${e.message ?: "Unknown error"}"
+                    "HTTP_429|Rate Limited - Too many requests"
+                else -> "NETWORK_ERROR|${e.message ?: "Unknown network error"}"
             }
             throw Exception(errorMsg)
         }

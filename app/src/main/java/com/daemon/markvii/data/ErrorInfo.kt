@@ -10,5 +10,6 @@ data class ErrorInfo(
     val fullDetails: String,
     val isRetryable: Boolean,
     val lastPrompt: String? = null,
-    val lastBitmap: android.graphics.Bitmap? = null
+    val lastBitmap: android.graphics.Bitmap? = null,
+    val rawException: String? = null  // Store complete exception for debugging
 )
