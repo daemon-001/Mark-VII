@@ -12,6 +12,10 @@ sealed class ChatUiEvent {
         val prompt: String,
         val bitmap: Bitmap?
     ) : ChatUiEvent()
+    data class RetryPrompt(
+        val prompt: String,
+        val bitmap: Bitmap?
+    ) : ChatUiEvent()
 }
 
 

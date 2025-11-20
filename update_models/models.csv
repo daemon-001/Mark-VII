@@ -13,6 +13,7 @@ google/gemma-3-4b-it,Google Gemma 3 4B,TRUE,11
 google/gemma-3-12b-it,Google Gemma 3 12B,TRUE,12
 google/gemma-3-27b-it,Google Gemma 3 27B,TRUE,13
 google/gemma-3n-e4b-it,Google Gemma 3N E4B,TRUE,14
+kwaipilot/kat-coder-pro,Kwaipilot KAT-Coder-Pro V1, TRUE,14
 meituan/longcat-flash-chat,Meituan Longcat Flash Chat,TRUE,15
 meta-llama/llama-3.2-3b-instruct,Meta Llama 3.2 Instruct,TRUE,16
 meta-llama/llama-3.3-70b-instruct,Meta Llama 3.3 Instruct,TRUE,17

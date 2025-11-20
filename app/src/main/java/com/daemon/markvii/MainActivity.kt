@@ -16,6 +16,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,6 +32,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -48,6 +50,7 @@ import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,6 +58,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -102,6 +106,7 @@ import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.rememberLottieComposition
+import com.daemon.markvii.data.Chat
 import com.daemon.markvii.data.ChatData
 import com.daemon.markvii.data.ModelConfiguration
 import com.daemon.markvii.data.ModelInfo
@@ -149,11 +154,6 @@ class MainActivity : ComponentActivity() {
         setContent {
 
             MarkVIITheme {
-                // Initialize Firebase configuration at app startup
-                LaunchedEffect(Unit) {
-                    FirebaseConfigManager.initialize()
-                }
-                
                 var opentimes by remember { mutableIntStateOf(0) }
                 // A surface container using the 'background' color from the theme
                 Surface(
@@ -238,6 +238,112 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @Composable
+    fun ErrorDialog(
+        errorTitle: String,
+        errorMessage: String,
+        errorDetails: String,
+        isRetryable: Boolean,
+        onDismiss: () -> Unit,
+        onRetry: (() -> Unit)? = null
+    ) {
+        var showDetails by remember { mutableStateOf(false) }
+
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            containerColor = Color(0xFF2C2C2E),
+            titleContentColor = Color(0xFFE5E5E5),
+            textContentColor = Color(0xFFE5E5E5),
+            shape = RoundedCornerShape(20.dp),
+            title = { 
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_pin), // Replace with error icon if available
+                        contentDescription = "Error",
+                        tint = Color(0xFFFF6B6B),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = errorTitle,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFE5E5E5)
+                    )
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        text = errorMessage,
+                        fontSize = 15.sp,
+                        color = Color(0xFFE5E5E5)
+                    )
+                    
+                    if (showDetails) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFF1C1C1E))
+                                .border(
+                                    width = 1.dp,
+                                    color = Color(0xFF3A3A3C),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .padding(12.dp)
+                        ) {
+                            SelectionContainer {
+                                Text(
+                                    text = errorDetails,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 13.sp,
+                                    color = Color(0xFFAAAAAA),
+                                    lineHeight = 18.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (isRetryable && onRetry != null) {
+                            onRetry()
+                        }
+                        onDismiss()
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                        contentColor = if (isRetryable) Color(0xFF00D9FF) else Color(0xFFE5E5E5)
+                    )
+                ) {
+                    Text(
+                        text = if (isRetryable) "Retry" else "OK",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDetails = !showDetails },
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                        contentColor = Color(0xFF8E8E93)
+                    )
+                ) {
+                    Text(
+                        text = if (showDetails) "Hide Details" else "Details",
+                        fontSize = 15.sp
+                    )
+                }
+            }
+        )
+    }
+
 //    chat home screen ui starts here
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
@@ -247,6 +353,107 @@ class MainActivity : ComponentActivity() {
         val bitmap = getBitmap()
         val voiceInput = voiceInputState.collectAsState().value
         val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+        
+        // Observe Firebase config state
+        val configState by FirebaseConfigManager.configState.collectAsState()
+        var showFirebaseError by remember { mutableStateOf(false) }
+        var firebaseErrorMessage by remember { mutableStateOf("") }
+        
+        // Initialize Firebase on first composition
+        LaunchedEffect(Unit) {
+            FirebaseConfigManager.initialize()
+        }
+        
+        // Show loading popup while Firebase is loading
+        if (configState is FirebaseConfigManager.ConfigState.Loading) {
+            AlertDialog(
+                onDismissRequest = { },
+                containerColor = Color(0xFF2C2C2E),
+                shape = RoundedCornerShape(20.dp),
+                title = null,
+                text = {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(60.dp),
+                            color = Color(0xFF00D9FF),
+                            strokeWidth = 4.dp
+                        )
+                        Text(
+                            text = "Loading models...",
+                            fontSize = 16.sp,
+                            color = Color(0xFFE5E5E5),
+                            fontFamily = FontFamily(Font(R.font.typographica))
+                        )
+                    }
+                },
+                confirmButton = { }
+            )
+        }
+        
+        // Show Firebase error dialog
+        if (showFirebaseError) {
+            ErrorDialog(
+                errorTitle = "Configuration Error",
+                errorMessage = "Failed to load Firebase configuration",
+                errorDetails = firebaseErrorMessage,
+                isRetryable = true,
+                onDismiss = { 
+                    showFirebaseError = false
+                },
+                onRetry = {
+                    scope.launch {
+                        FirebaseConfigManager.initialize()
+                    }
+                }
+            )
+        }
+        
+        // Monitor config state for errors
+        LaunchedEffect(configState) {
+            when (configState) {
+                is FirebaseConfigManager.ConfigState.Error -> {
+                    val error = configState as FirebaseConfigManager.ConfigState.Error
+                    firebaseErrorMessage = error.message
+                    showFirebaseError = true
+                }
+                else -> {
+                    showFirebaseError = false
+                }
+            }
+        }
+        
+        // Observe error state from ViewModel
+        val currentError = chatState.error
+
+        // Show error dialog when error state is present
+        currentError?.let { errorInfo ->
+            ErrorDialog(
+                errorTitle = errorInfo.title,
+                errorMessage = errorInfo.mainMessage,
+                errorDetails = errorInfo.fullDetails,
+                isRetryable = errorInfo.isRetryable,
+                onDismiss = { 
+                    chaViewModel.clearError()
+                },
+                onRetry = if (errorInfo.isRetryable) {
+                    {
+                        errorInfo.lastPrompt?.let { prompt ->
+                            chaViewModel.onEvent(
+                                ChatUiEvent.RetryPrompt(
+                                    prompt,
+                                    errorInfo.lastBitmap
+                                )
+                            )
+                        }
+                    }
+                } else null
+            )
+        }
         
         // Model selector state for prompt box
         val isPromptDropDownExpanded = remember { mutableStateOf(false) }
@@ -301,6 +508,13 @@ class MainActivity : ComponentActivity() {
                     .padding(horizontal = 8.dp),
                 reverseLayout = true,
             ) {
+                // Show typing indicator when generating response
+                if (chatState.isGeneratingResponse) {
+                    item {
+                        TypingIndicator()
+                    }
+                }
+                
                 itemsIndexed(chatState.chatList) { index, chat ->
                     if (chat.isFromUser) {
                         UserChatItem(
@@ -693,6 +907,47 @@ class MainActivity : ComponentActivity() {
 
     }
 
+//    Typing indicator animation (WhatsApp style)
+    @Composable
+    fun TypingIndicator() {
+        val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "typing")
+        
+        Row(
+            modifier = Modifier
+                .padding(start = 8.dp, end = 50.dp, top = 8.dp, bottom = 8.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color(0xFF2C2C2E))
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Three animated dots
+            for (i in 0..2) {
+                val offset by infiniteTransition.animateFloat(
+                    initialValue = 0f,
+                    targetValue = -8f,
+                    animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                        animation = androidx.compose.animation.core.tween(
+                            durationMillis = 600,
+                            delayMillis = i * 200,
+                            easing = androidx.compose.animation.core.FastOutSlowInEasing
+                        ),
+                        repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                    ),
+                    label = "dot_$i"
+                )
+                
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .offset(y = offset.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF8E8E93))
+                )
+            }
+        }
+    }
+
 //    user chat text bubble
     @Composable
     fun UserChatItem(prompt: String, bitmap: Bitmap?) {
@@ -984,20 +1239,3 @@ class MainActivity : ComponentActivity() {
 
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

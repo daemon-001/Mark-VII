@@ -61,12 +61,7 @@ object ChatData {
         try {
             // Check if API key is loaded
             if (openrouter_api_key.isEmpty()) {
-                return Chat(
-                    prompt = "⚠️ API Key Missing!\n\nPlease configure Firebase:\n1. Add OpenRouter API key to Firebase\n2. Field: openrouterApiKey\n3. Location: app_config/api_keys\n\nSee TROUBLESHOOTING_401_ERROR.md",
-                    bitmap = null,
-                    isFromUser = false,
-                    modelUsed = ""
-                )
+                throw Exception("API_KEY_MISSING|⚠️ API Key Missing!\n\nPlease configure Firebase:\n1. Add OpenRouter API key to Firebase\n2. Field: openrouterApiKey\n3. Location: app_config/api_keys\n\nSee TROUBLESHOOTING_401_ERROR.md")
             }
             
             // Use a valid default model if none selected
@@ -100,17 +95,12 @@ object ChatData {
             if (response.error != null) {
                 val errorMsg = when {
                     response.error.message.contains("401") || response.error.message.contains("Unauthorized") -> 
-                        "⚠️ HTTP 401: Unauthorized\n\nYour API key is invalid or missing.\n\nSolution:\n1. Get key from: https://openrouter.ai/keys\n2. Add to Firebase: app_config/api_keys\n3. Field: openrouterApiKey\n\nSee TROUBLESHOOTING_401_ERROR.md"
+                        "HTTP_401|⚠️ HTTP 401: Unauthorized\n\nYour API key is invalid or missing.\n\nSolution:\n1. Get key from: https://openrouter.ai/keys\n2. Add to Firebase: app_config/api_keys\n3. Field: openrouterApiKey\n\nSee TROUBLESHOOTING_401_ERROR.md"
                     response.error.message.contains("404") || response.error.message.contains("Not Found") ->
-                        "⚠️ HTTP 404: Model Not Found\n\nThe model '$modelToUse' doesn't exist.\n\nSolution:\n1. Check model name in Firebase\n2. Use valid OpenRouter model\n3. See available models: https://openrouter.ai/models\n\nCommon models:\n- anthropic/claude-3-5-sonnet-20241022\n- openai/gpt-4-turbo\n- openai/gpt-3.5-turbo"
-                    else -> "Error: ${response.error.message}"
+                        "HTTP_404|⚠️ HTTP 404: Model Not Found\n\nThe model '$modelToUse' doesn't exist.\n\nSolution:\n1. Check model name in Firebase\n2. Use valid OpenRouter model\n3. See available models: https://openrouter.ai/models\n\nCommon models:\n- anthropic/claude-3-5-sonnet-20241022\n- openai/gpt-4-turbo\n- openai/gpt-3.5-turbo"
+                    else -> "API_ERROR|Error: ${response.error.message}"
                 }
-                return Chat(
-                    prompt = errorMsg,
-                    bitmap = null,
-                    isFromUser = false,
-                    modelUsed = modelToUse
-                )
+                throw Exception(errorMsg)
             }
 
             // Get response text
@@ -125,23 +115,23 @@ object ChatData {
             )
 
         } catch (e: Exception) {
+            // Re-throw if already formatted
+            if (e.message?.contains("|") == true) {
+                throw e
+            }
+            
             val errorMsg = when {
                 e.message?.contains("401") == true -> 
-                    "⚠️ HTTP 401: Unauthorized\n\nYour OpenRouter API key is invalid.\n\nSteps to fix:\n1. Go to https://openrouter.ai/keys\n2. Create/copy your API key\n3. Add to Firebase: app_config/api_keys/openrouterApiKey\n4. Restart app\n\nSee TROUBLESHOOTING_401_ERROR.md for details"
+                    "HTTP_401|⚠️ HTTP 401: Unauthorized\n\nYour OpenRouter API key is invalid.\n\nSteps to fix:\n1. Go to https://openrouter.ai/keys\n2. Create/copy your API key\n3. Add to Firebase: app_config/api_keys/openrouterApiKey\n4. Restart app\n\nSee TROUBLESHOOTING_401_ERROR.md for details"
                 e.message?.contains("403") == true -> 
-                    "⚠️ HTTP 403: Forbidden\n\nCheck OpenRouter account credits"
+                    "HTTP_403|⚠️ HTTP 403: Forbidden\n\nCheck OpenRouter account credits"
                 e.message?.contains("404") == true ->
-                    "⚠️ HTTP 404: Model Not Found\n\nThe selected model doesn't exist on OpenRouter.\n\nSolution:\n1. Update model names in Firebase\n2. Use valid OpenRouter models\n3. Check: https://openrouter.ai/models\n\nWorking models:\n- anthropic/claude-3-5-sonnet-20241022\n- openai/gpt-4-turbo-preview\n- openai/gpt-3.5-turbo"
+                    "HTTP_404|⚠️ HTTP 404: Model Not Found\n\nThe selected model doesn't exist on OpenRouter.\n\nSolution:\n1. Update model names in Firebase\n2. Use valid OpenRouter models\n3. Check: https://openrouter.ai/models\n\nWorking models:\n- anthropic/claude-3-5-sonnet-20241022\n- openai/gpt-4-turbo-preview\n- openai/gpt-3.5-turbo"
                 e.message?.contains("429") == true -> 
-                    "⚠️ Rate Limited\n\nToo many requests. Wait a moment and try again."
-                else -> "Error: ${e.message ?: "Network error"}\n\nCheck internet connection and Firebase configuration."
+                    "HTTP_429|⚠️ Rate Limited\n\nToo many requests. Wait a moment and try again."
+                else -> "NETWORK_ERROR|Network Error\n\nCouldn't connect to AI service.\n\nCheck:\n• Internet connection\n• Firebase configuration\n\nDetails: ${e.message ?: "Unknown error"}"
             }
-            return Chat(
-                prompt = errorMsg,
-                bitmap = null,
-                isFromUser = false,
-                modelUsed = selected_model
-            )
+            throw Exception(errorMsg)
         }
     }
 
@@ -184,12 +174,7 @@ object ChatData {
 
             // Check for errors
             if (response.error != null) {
-                return Chat(
-                    prompt = "Error: ${response.error.message}",
-                    bitmap = null,
-                    isFromUser = false,
-                    modelUsed = modelToUse
-                )
+                throw Exception("API_ERROR|Error: ${response.error.message}")
             }
 
             // Get response text
@@ -204,12 +189,12 @@ object ChatData {
             )
 
         } catch (e: Exception) {
-            return Chat(
-                prompt = "Model Offline: ${e.message}",
-                bitmap = null,
-                isFromUser = false,
-                modelUsed = selected_model
-            )
+            // Re-throw if already formatted
+            if (e.message?.contains("|") == true) {
+                throw e
+            }
+            
+            throw Exception("NETWORK_ERROR|Model Offline: ${e.message ?: "Unknown error"}")
         }
     }
 }
