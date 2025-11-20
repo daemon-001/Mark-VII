@@ -17,7 +17,8 @@ data class OpenRouterRequest(
     val model: String,
     val messages: List<Message>,
     val max_tokens: Int = 1000,
-    val temperature: Double = 0.7
+    val temperature: Double = 0.7,
+    val stream: Boolean = false
 )
 
 data class Message(
@@ -101,6 +102,9 @@ interface OpenRouterApiService {
     @POST("chat/completions")
     suspend fun chatCompletion(@Body request: OpenRouterRequest): OpenRouterResponse
     
+    @POST("chat/completions")
+    suspend fun chatCompletionStream(@Body request: OpenRouterRequest): okhttp3.ResponseBody
+    
     @GET("models")
     suspend fun getModels(): OpenRouterModelsResponse
 }
@@ -142,9 +146,10 @@ object OpenRouterClient {
             chain.proceed(request)
         }
         .addInterceptor(loggingInterceptor)
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(120, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
         .build()
     
     private val retrofit = Retrofit.Builder()

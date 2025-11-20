@@ -58,6 +58,9 @@ object ChatData {
      */
     suspend fun fetchFreeModels(): List<ModelInfo> {
         return try {
+            // First, ensure exception models are loaded from Firebase
+            val exceptionModelsMap = FirebaseConfigManager.exceptionModels.value
+            
             val allModels = fetchAvailableModels()
             
             allModels.filter { model ->
@@ -67,16 +70,36 @@ object ChatData {
                 
                 // Free models have 0 cost for both prompt and completion
                 promptPrice == 0.0 && completionPrice == 0.0
-            }.mapIndexed { _, model ->
-                // Clean up display name but keep original model ID
+            }.map { model ->
+                // Clean up display name
                 val cleanDisplayName = (model.name ?: model.id)
                     .replace("(free)", "", ignoreCase = true)
                     .replace("  ", " ")
                     .trim()
                 
+                // Check if this model (without :free) is in exception list
+                val modelIdWithoutFree = model.id.replace(":free", "", ignoreCase = true)
+                val isInExceptionList = exceptionModelsMap.keys.any { exceptionId ->
+                    val exceptionIdWithoutFree = exceptionId.replace(":free", "", ignoreCase = true)
+                    exceptionIdWithoutFree.equals(modelIdWithoutFree, ignoreCase = true)
+                }
+                
+                // Determine final API model ID
+                val cleanApiModel = if (isInExceptionList) {
+                    // Keep or add :free postfix for exception models
+                    if (modelIdWithoutFree.endsWith(":free", ignoreCase = true)) {
+                        modelIdWithoutFree
+                    } else {
+                        "$modelIdWithoutFree:free"
+                    }
+                } else {
+                    // Remove :free for non-exception models
+                    modelIdWithoutFree
+                }
+                
                 ModelInfo(
                     displayName = cleanDisplayName,
-                    apiModel = model.id,
+                    apiModel = cleanApiModel,
                     isAvailable = true
                 )
             }
@@ -158,18 +181,44 @@ object ChatData {
                 throw e
             }
             
-            val errorMsg = when {
-                e.message?.contains("401") == true -> 
-                    "HTTP_401|HTTP 401: Unauthorized - OpenRouter API key is invalid"
-                e.message?.contains("403") == true -> 
-                    "HTTP_403|HTTP 403: Forbidden - Insufficient credits or permissions"
-                e.message?.contains("404") == true ->
-                    "HTTP_404|HTTP 404: Model Not Found - The selected model doesn't exist on OpenRouter"
-                e.message?.contains("429") == true -> 
-                    "HTTP_429|Rate Limited - Too many requests"
-                else -> "NETWORK_ERROR|${e.message ?: "Unknown network error"}"
+            // Handle HTTP errors with specific codes
+            val errorMessage = when {
+                e is retrofit2.HttpException -> {
+                    when (e.code()) {
+                        400 -> "BAD_REQUEST|Invalid request parameters or CORS issue"
+                        401 -> "UNAUTHORIZED|Invalid API key or expired session"
+                        402 -> "INSUFFICIENT_CREDITS|Your account has insufficient credits"
+                        403 -> "CONTENT_FLAGGED|Your input was flagged by moderation"
+                        404 -> {
+                            // Model not found - try adding :free postfix
+                            val modelToUse = when {
+                                selected_model.isNotEmpty() -> selected_model
+                                else -> "anthropic/claude-3-5-sonnet-20241022"
+                            }
+                            
+                            // If model doesn't have :free, add it to exception list and retry
+                            if (!modelToUse.endsWith(":free", ignoreCase = true)) {
+                                val fixedModel = handle404Error(modelToUse)
+                                "MODEL_404_RETRY|Model not found. Retrying with corrected ID: $fixedModel"
+                            } else {
+                                "MODEL_NOT_FOUND|Model not available: $modelToUse"
+                            }
+                        }
+                        408 -> "REQUEST_TIMEOUT|Your request timed out. Try again"
+                        429 -> "RATE_LIMITED|Too many requests. Please wait and retry"
+                        502 -> "MODEL_DOWN|Model is currently unavailable or returned invalid response"
+                        503 -> "NO_PROVIDER|No available model provider meets your requirements"
+                        else -> "HTTP_ERROR|Error ${e.code()}: ${e.message()}"
+                    }
+                }
+                e is java.net.SocketTimeoutException -> "TIMEOUT|Request timed out. Check your connection"
+                e is java.net.UnknownHostException -> "NO_INTERNET|No internet connection available"
+                e is java.net.ConnectException -> "CONNECTION_FAILED|Could not connect to server"
+                e is java.io.IOException -> "NETWORK_ERROR|Network error: ${e.message}"
+                else -> "UNKNOWN_ERROR|${e.message ?: "An unexpected error occurred"}"
             }
-            throw Exception(errorMsg)
+            
+            throw Exception(errorMessage)
         }
     }
 
@@ -232,7 +281,217 @@ object ChatData {
                 throw e
             }
             
-            throw Exception("NETWORK_ERROR|Model Offline: ${e.message ?: "Unknown error"}")
+            // Handle HTTP errors with specific codes
+            val errorMessage = when {
+                e is retrofit2.HttpException -> {
+                    when (e.code()) {
+                        400 -> "BAD_REQUEST|Invalid request parameters or CORS issue"
+                        401 -> "UNAUTHORIZED|Invalid API key or expired session"
+                        402 -> "INSUFFICIENT_CREDITS|Your account has insufficient credits"
+                        403 -> "CONTENT_FLAGGED|Your input was flagged by moderation"
+                        404 -> {
+                            // Model not found - try adding :free postfix
+                            val modelToUse = when {
+                                selected_model.isNotEmpty() -> selected_model
+                                else -> "anthropic/claude-3-5-sonnet-20241022"
+                            }
+                            
+                            // If model doesn't have :free, add it to exception list and retry
+                            if (!modelToUse.endsWith(":free", ignoreCase = true)) {
+                                val fixedModel = handle404Error(modelToUse)
+                                "MODEL_404_RETRY|Model not found. Retrying with corrected ID: $fixedModel"
+                            } else {
+                                "MODEL_NOT_FOUND|Model not available: $modelToUse"
+                            }
+                        }
+                        408 -> "REQUEST_TIMEOUT|Your request timed out. Try again"
+                        429 -> "RATE_LIMITED|Too many requests. Please wait and retry"
+                        502 -> "MODEL_DOWN|Model is currently unavailable or returned invalid response"
+                        503 -> "NO_PROVIDER|No available model provider meets your requirements"
+                        else -> "HTTP_ERROR|Error ${e.code()}: ${e.message()}"
+                    }
+                }
+                e is java.net.SocketTimeoutException -> "TIMEOUT|Request timed out. Check your connection"
+                e is java.net.UnknownHostException -> "NO_INTERNET|No internet connection available"
+                e is java.net.ConnectException -> "CONNECTION_FAILED|Could not connect to server"
+                e is java.io.IOException -> "NETWORK_ERROR|Network error: ${e.message}"
+                else -> "UNKNOWN_ERROR|${e.message ?: "An unexpected error occurred"}"
+            }
+            
+            throw Exception(errorMessage)
+        }
+    }
+    
+    /**
+     * Get streaming response from AI model
+     * Yields partial responses as they are generated
+     */
+    suspend fun getStreamingResponse(
+        prompt: String,
+        onChunk: (String) -> Unit
+    ): Chat = withContext(Dispatchers.IO) {
+        try {
+            // Check if API key is loaded
+            if (openrouter_api_key.isEmpty()) {
+                throw Exception("API_KEY_MISSING|API key is not configured")
+            }
+            
+            // Use a valid default model if none selected
+            val modelToUse = when {
+                selected_model.isNotEmpty() -> selected_model
+                else -> "anthropic/claude-3-5-sonnet-20241022"
+            }
+            
+            val request = OpenRouterRequest(
+                model = modelToUse,
+                messages = listOf(
+                    Message(
+                        role = "user",
+                        content = listOf(
+                            Content(
+                                type = "text",
+                                text = prompt
+                            )
+                        )
+                    )
+                ),
+                max_tokens = 2000,
+                temperature = 0.7,
+                stream = true
+            )
+
+            val responseBody = OpenRouterClient.api.chatCompletionStream(request)
+            val fullResponse = StringBuilder()
+            
+            // Read SSE stream with better error handling
+            try {
+                responseBody.byteStream().bufferedReader().use { reader ->
+                    reader.lineSequence().forEach { line ->
+                        if (line.startsWith("data: ")) {
+                            val data = line.substring(6)
+                            if (data == "[DONE]") return@forEach
+                            
+                            try {
+                                val json = com.google.gson.Gson().fromJson(data, com.google.gson.JsonObject::class.java)
+                                val delta = json.getAsJsonArray("choices")
+                                    ?.get(0)?.asJsonObject
+                                    ?.getAsJsonObject("delta")
+                                    ?.get("content")?.asString
+                                
+                                if (delta != null) {
+                                    fullResponse.append(delta)
+                                    withContext(Dispatchers.Main) {
+                                        onChunk(delta)
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                // Skip malformed chunks
+                            }
+                        }
+                    }
+                }
+            } catch (e: java.io.IOException) {
+                // If we got some response before connection error, return what we have
+                if (fullResponse.isNotEmpty()) {
+                    return@withContext Chat(
+                        prompt = fullResponse.toString(),
+                        bitmap = null,
+                        isFromUser = false,
+                        modelUsed = modelToUse
+                    )
+                }
+                throw Exception("NETWORK_ERROR|Connection interrupted: ${e.message ?: "Network error"}")
+            }
+
+            return@withContext Chat(
+                prompt = fullResponse.toString(),
+                bitmap = null,
+                isFromUser = false,
+                modelUsed = modelToUse
+            )
+
+        } catch (e: Exception) {
+            // Re-throw if already formatted
+            if (e.message?.contains("|") == true) {
+                throw e
+            }
+            
+            // Handle HTTP errors with specific codes
+            val errorMessage = when {
+                e is retrofit2.HttpException -> {
+                    when (e.code()) {
+                        400 -> "BAD_REQUEST|Invalid request parameters or CORS issue"
+                        401 -> "UNAUTHORIZED|Invalid API key or expired session"
+                        402 -> "INSUFFICIENT_CREDITS|Your account has insufficient credits"
+                        403 -> "CONTENT_FLAGGED|Your input was flagged by moderation"
+                        404 -> {
+                            // Model not found - try adding :free postfix
+                            val modelToUse = when {
+                                selected_model.isNotEmpty() -> selected_model
+                                else -> "anthropic/claude-3-5-sonnet-20241022"
+                            }
+                            
+                            // If model doesn't have :free, add it to exception list and retry
+                            if (!modelToUse.endsWith(":free", ignoreCase = true)) {
+                                val fixedModel = handle404Error(modelToUse)
+                                "MODEL_404_RETRY|Model not found. Retrying with corrected ID: $fixedModel"
+                            } else {
+                                "MODEL_NOT_FOUND|Model not available: $modelToUse"
+                            }
+                        }
+                        408 -> "REQUEST_TIMEOUT|Your request timed out. Try again"
+                        429 -> "RATE_LIMITED|Too many requests. Please wait and retry"
+                        502 -> "MODEL_DOWN|Model is currently unavailable or returned invalid response"
+                        503 -> "NO_PROVIDER|No available model provider meets your requirements"
+                        else -> "HTTP_ERROR|Error ${e.code()}: ${e.message()}"
+                    }
+                }
+                e is java.net.SocketTimeoutException -> "TIMEOUT|Request timed out. Check your connection"
+                e is java.net.UnknownHostException -> "NO_INTERNET|No internet connection available"
+                e is java.net.ConnectException -> "CONNECTION_FAILED|Could not connect to server"
+                e is java.io.IOException -> "NETWORK_ERROR|Network error: ${e.message}"
+                else -> "UNKNOWN_ERROR|${e.message ?: "An unexpected error occurred"}"
+            }
+            
+            throw Exception(errorMessage)
+        }
+    }
+    
+    /**
+     * Handle 404 model not found error
+     * Automatically adds model to exception list with ":free" postfix
+     */
+    private suspend fun handle404Error(modelId: String): String {
+        return withContext(Dispatchers.IO) {
+            try {
+                // Check if model already has :free postfix
+                if (modelId.endsWith(":free", ignoreCase = true)) {
+                    return@withContext modelId
+                }
+                
+                // Add :free postfix to model ID
+                val modelWithFree = "$modelId:free"
+                
+                // Get model name from available models list
+                val modelName = try {
+                    val allModels = fetchAvailableModels()
+                    val foundModel = allModels.find { it.id == modelWithFree || it.id == modelId }
+                    foundModel?.name ?: modelId.substringAfterLast("/").replace("-", " ").capitalize()
+                } catch (e: Exception) {
+                    modelId.substringAfterLast("/").replace("-", " ").capitalize()
+                }
+                
+                // Add to Firebase exception list with model name (this will await and save to Firestore)
+                FirebaseConfigManager.addExceptionModel(modelWithFree, modelName)
+                
+                // Update selected model
+                selected_model = modelWithFree
+                
+                return@withContext modelWithFree
+            } catch (e: Exception) {
+                return@withContext modelId
+            }
         }
     }
 }
+

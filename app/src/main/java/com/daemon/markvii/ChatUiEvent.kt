@@ -16,6 +16,7 @@ sealed class ChatUiEvent {
         val prompt: String,
         val bitmap: Bitmap?
     ) : ChatUiEvent()
+    object StopStreaming : ChatUiEvent()
 }
 
 

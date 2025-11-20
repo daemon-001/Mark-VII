@@ -29,6 +29,10 @@ object FirebaseConfigManager {
     private val _apiKey = MutableStateFlow<String>("")
     val apiKey: StateFlow<String> = _apiKey.asStateFlow()
     
+    // Exception models that require ":free" postfix - stored as map of modelId to modelName
+    private val _exceptionModels = MutableStateFlow<Map<String, String>>(emptyMap())
+    val exceptionModels: StateFlow<Map<String, String>> = _exceptionModels.asStateFlow()
+    
     /**
      * Sealed class to represent configuration loading states
      */
@@ -48,6 +52,7 @@ object FirebaseConfigManager {
             // Fetch models and API keys concurrently
             fetchModels()
             fetchApiKeys()
+            fetchExceptionModels()
             
             _configState.value = ConfigState.Success
             Log.d(TAG, "Firebase configuration loaded successfully")
@@ -73,6 +78,7 @@ object FirebaseConfigManager {
             
             if (document.exists()) {
                 val modelsList = mutableListOf<FirebaseModelInfo>()
+                @Suppress("UNCHECKED_CAST")
                 val modelsData = document.get("list") as? List<Map<String, Any>>
                 
                 modelsData?.forEach { modelMap ->
@@ -120,6 +126,127 @@ object FirebaseConfigManager {
             Log.e(TAG, "Error fetching API keys", e)
             loadDefaultApiKey()
         }
+    }
+    
+    /**
+     * Fetch exception models list from Firebase
+     * These models require ":free" postfix to work properly
+     */
+    private suspend fun fetchExceptionModels() {
+        try {
+            val document = firestore.collection(COLLECTION_CONFIG)
+                .document("exp_models")
+                .get()
+                .await()
+            
+            if (document.exists()) {
+                @Suppress("UNCHECKED_CAST")
+                val modelsList = document.get("list") as? List<Map<String, String>> ?: emptyList()
+                val modelsMap = modelsList.associate { 
+                    (it["modelId"] ?: "") to (it["modelName"] ?: "")
+                }
+                _exceptionModels.value = modelsMap
+            } else {
+                _exceptionModels.value = emptyMap()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching exception models", e)
+            _exceptionModels.value = emptyMap()
+        }
+    }
+    
+    /**
+     * Add a model to the exception list in Firebase
+     * This model will keep its ":free" postfix
+     */
+    suspend fun addExceptionModel(modelId: String, modelName: String) {
+        try {
+            // Get current list from Firestore directly to ensure we have latest data
+            val document = firestore.collection(COLLECTION_CONFIG)
+                .document("exp_models")
+                .get()
+                .await()
+            
+            val currentMap = if (document.exists()) {
+                @Suppress("UNCHECKED_CAST")
+                val existingList = document.get("list") as? List<Map<String, String>> ?: emptyList()
+                existingList.associate { 
+                    (it["modelId"] ?: "") to (it["modelName"] ?: "")
+                }.toMutableMap()
+            } else {
+                mutableMapOf<String, String>()
+            }
+            
+            // Check if already exists
+            if (currentMap.containsKey(modelId)) {
+                return
+            }
+            
+            currentMap[modelId] = modelName
+            
+            // Convert to list of maps for Firebase
+            val listForFirebase = currentMap.map { (id, name) ->
+                hashMapOf(
+                    "modelId" to id,
+                    "modelName" to name
+                )
+            }
+            
+            val data = hashMapOf(
+                "list" to listForFirebase,
+                "lastUpdated" to com.google.firebase.Timestamp.now()
+            )
+            
+            // Use set with merge to create or update the document
+            firestore.collection(COLLECTION_CONFIG)
+                .document("exp_models")
+                .set(data, com.google.firebase.firestore.SetOptions.merge())
+                .await()
+            
+            // Update local state
+            _exceptionModels.value = currentMap
+        } catch (e: Exception) {
+            Log.e(TAG, "Error adding exception model: $modelId", e)
+        }
+    }
+    
+    /**
+     * Check if a model is in the exception list
+     */
+    fun isExceptionModel(modelId: String): Boolean {
+        return _exceptionModels.value.containsKey(modelId)
+    }
+    
+    /**
+     * Test Firebase write permissions
+     * Call this to verify Firebase is writable
+     */
+    suspend fun testFirebaseWrite(): Boolean {
+        return try {
+            val testData = hashMapOf(
+                "test" to "write_test",
+                "timestamp" to com.google.firebase.Timestamp.now()
+            )
+            
+            firestore.collection(COLLECTION_CONFIG)
+                .document("exp_models")
+                .set(testData, com.google.firebase.firestore.SetOptions.merge())
+                .await()
+            
+            Log.d(TAG, "Firebase write test SUCCESSFUL")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Firebase write test FAILED", e)
+            Log.e(TAG, "Error message: ${e.message}")
+            false
+        }
+    }
+    
+    /**
+     * Get current exception models list (for debugging)
+     */
+    fun getExceptionModelsList(): Map<String, String> {
+        return _exceptionModels.value
     }
     
     /**

@@ -24,6 +24,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +41,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -53,6 +55,7 @@ import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -85,6 +88,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -92,6 +96,8 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
@@ -163,6 +169,9 @@ class MainActivity : ComponentActivity() {
                 textToSpeech?.language = java.util.Locale.US
             }
         }
+        
+        // Set window background to black to prevent white flash when keyboard appears
+        window.decorView.setBackgroundColor(android.graphics.Color.BLACK)
         
         setContent {
 
@@ -275,32 +284,36 @@ class MainActivity : ComponentActivity() {
             textContentColor = Color(0xFFE5E5E5),
             shape = RoundedCornerShape(20.dp),
             title = { 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_pin), // Replace with error icon if available
-                        contentDescription = "Error",
-                        tint = Color(0xFFFF6B6B),
-                        modifier = Modifier.size(24.dp)
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_pin),
+                            contentDescription = "Error",
+                            tint = Color(0xFFFF6B6B),
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            text = errorTitle,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFF6B6B)
+                        )
+                    }
                     Text(
-                        text = errorTitle,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFE5E5E5)
+                        text = errorMessage,
+                        fontSize = 14.sp,
+                        color = Color(0xFFE5E5E5),
+                        modifier = Modifier.padding(start = 32.dp)
                     )
                 }
             },
             text = {
                 Column {
-                    Text(
-                        text = errorMessage,
-                        fontSize = 15.sp,
-                        color = Color(0xFFE5E5E5)
-                    )
-                    
                     if (showDetails) {
                         Spacer(modifier = Modifier.height(16.dp))
                         Box(
@@ -373,9 +386,46 @@ class MainActivity : ComponentActivity() {
     fun ChatScreen(paddingValues: PaddingValues) {
         val chaViewModel = viewModel<ChatViewModel>()
         val chatState = chaViewModel.chatState.collectAsState().value
-        val bitmap = getBitmap()
+        val bitmap = getSelectedBitmap()
         val voiceInput = voiceInputState.collectAsState().value
         val context = LocalContext.current
+        val hapticFeedback = androidx.compose.ui.platform.LocalHapticFeedback.current
+        
+        // Track last haptic trigger position for consistent feedback
+        val lastHapticPosition = remember { mutableStateOf(0) }
+        val hasTriggeredStartHaptic = remember { mutableStateOf(false) }
+        val currentChat = chatState.chatList.firstOrNull()
+        
+        // Haptic feedback during streaming - triggered by snapshot reads in composition
+        if (currentChat != null && currentChat.isStreaming && !currentChat.isFromUser) {
+            val currentLength = currentChat.prompt.length
+            
+            // Immediate haptic on streaming start
+            if (!hasTriggeredStartHaptic.value && currentLength > 0) {
+                androidx.compose.runtime.SideEffect {
+                    hapticFeedback.performHapticFeedback(
+                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove
+                    )
+                    hasTriggeredStartHaptic.value = true
+                    lastHapticPosition.value = currentLength
+                }
+            }
+            // Then trigger at regular character intervals (every 10 chars)
+            else if (currentLength >= lastHapticPosition.value + 10) {
+                androidx.compose.runtime.SideEffect {
+                    hapticFeedback.performHapticFeedback(
+                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove
+                    )
+                    lastHapticPosition.value = currentLength
+                }
+            }
+        } else if (currentChat?.isStreaming == false) {
+            // Reset when streaming ends
+            androidx.compose.runtime.SideEffect {
+                lastHapticPosition.value = 0
+                hasTriggeredStartHaptic.value = false
+            }
+        }
         
         // State for loading free models from OpenRouter
         var isLoadingModels by remember { mutableStateOf(false) }
@@ -385,7 +435,7 @@ class MainActivity : ComponentActivity() {
         // Observe Firebase API key
         val firebaseApiKey by FirebaseConfigManager.apiKey.collectAsState()
         
-        // Initialize Firebase to get API key
+        // Initialize Firebase to get API key and exception models
         LaunchedEffect(Unit) {
             FirebaseConfigManager.initialize()
         }
@@ -397,18 +447,23 @@ class MainActivity : ComponentActivity() {
             }
         }
         
-        // Load free models from OpenRouter on first composition
-        LaunchedEffect(Unit) {
-            isLoadingModels = true
-            try {
-                freeModels = ChatData.fetchFreeModels()
-                if (freeModels.isEmpty()) {
-                    modelsLoadError = "No free models available"
+        // Load free models from OpenRouter AFTER Firebase initializes
+        // Observe exception models to trigger reload when they change
+        val exceptionModels by FirebaseConfigManager.exceptionModels.collectAsState()
+        
+        LaunchedEffect(firebaseApiKey, exceptionModels) {
+            if (firebaseApiKey.isNotEmpty()) {
+                isLoadingModels = true
+                try {
+                    freeModels = ChatData.fetchFreeModels()
+                    if (freeModels.isEmpty()) {
+                        modelsLoadError = "No free models available"
+                    }
+                } catch (e: Exception) {
+                    modelsLoadError = "Failed to load models: ${e.message}"
+                } finally {
+                    isLoadingModels = false
                 }
-            } catch (e: Exception) {
-                modelsLoadError = "Failed to load models: ${e.message}"
-            } finally {
-                isLoadingModels = false
             }
         }
         
@@ -474,12 +529,18 @@ class MainActivity : ComponentActivity() {
         val isPromptDropDownExpanded = remember { mutableStateOf(false) }
         val promptItemPosition = remember { mutableStateOf(0) }
         
+        // LazyList state for auto-scrolling
+        val listState = rememberLazyListState()
+        val coroutineScope = rememberCoroutineScope()
+        
         val currentModels = freeModels
         
-        // Set initial model when models load
+        // Set initial model when models load (only once)
+        var hasSetInitialModel by remember { mutableStateOf(false) }
         LaunchedEffect(currentModels) {
-            if (currentModels.isNotEmpty() && promptItemPosition.value < currentModels.size) {
+            if (!hasSetInitialModel && currentModels.isNotEmpty() && promptItemPosition.value < currentModels.size) {
                 ChatData.selected_model = currentModels[promptItemPosition.value].apiModel
+                hasSetInitialModel = true
             }
         }
 
@@ -488,6 +549,13 @@ class MainActivity : ComponentActivity() {
             if (voiceInput.isNotEmpty()) {
                 chaViewModel.onEvent(ChatUiEvent.UpdatePrompt(voiceInput))
                 voiceInputState.update { "" }
+            }
+        }
+
+        // Auto-scroll to bottom when new message appears
+        LaunchedEffect(chatState.chatList.size) {
+            if (chatState.chatList.isNotEmpty()) {
+                listState.animateScrollToItem(0)
             }
         }
 
@@ -506,17 +574,14 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 8.dp),
+                    state = listState,
                     reverseLayout = true,
-                    contentPadding = PaddingValues(bottom = 200.dp) // Space for prompt box
+                    contentPadding = PaddingValues(bottom = 140.dp) // Space for prompt box
                 ) {
-                    // Show typing indicator when generating response
-                    if (chatState.isGeneratingResponse) {
-                        item {
-                            TypingIndicator()
-                        }
-                    }
-                    
-                    itemsIndexed(chatState.chatList) { index, chat ->
+                    itemsIndexed(
+                        items = chatState.chatList,
+                        key = { _, chat -> chat.id }
+                    ) { index, chat ->
                         if (chat.isFromUser) {
                             UserChatItem(
                                 prompt = chat.prompt, bitmap = chat.bitmap
@@ -530,6 +595,8 @@ class MainActivity : ComponentActivity() {
                             ModelChatItem(
                                 response = chat.prompt,
                                 modelUsed = chat.modelUsed,
+                                isStreaming = chat.isStreaming,
+                                freeModels = freeModels,
                                 onRetry = { _ ->
                                     chaViewModel.onEvent(
                                         ChatUiEvent.RetryPrompt(
@@ -635,16 +702,16 @@ class MainActivity : ComponentActivity() {
                             .fillMaxWidth()
                             .shadow(
                                 elevation = 8.dp,
-                                shape = RoundedCornerShape(28.dp),
+                                shape = RoundedCornerShape(20.dp),
                                 ambientColor = Color.Black.copy(alpha = 0.4f),
                                 spotColor = Color.Black.copy(alpha = 0.4f)
                             )
-                            .clip(RoundedCornerShape(28.dp))
+                            .clip(RoundedCornerShape(20.dp))
                             .background(Color(0xFF2C2C2E))
                             .border(
                                 width = 1.dp,
                                 color = Color(0xFF3A3A3C),
-                                shape = RoundedCornerShape(28.dp)
+                                shape = RoundedCornerShape(20.dp)
                             )
                     ) {
                         Column {
@@ -678,8 +745,8 @@ class MainActivity : ComponentActivity() {
                                     focusedContainerColor = Color.Transparent,
                                     unfocusedContainerColor = Color.Transparent,
                                     disabledContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent,
                                     disabledIndicatorColor = Color.Transparent,
                                     cursorColor = Color(0xFFE5E5E5),
                                     focusedPlaceholderColor = Color(0xFF8E8E93),
@@ -691,7 +758,7 @@ class MainActivity : ComponentActivity() {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(start = 16.dp, end = 12.dp, bottom = 8.dp, top = 0.dp),
+                                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
@@ -897,35 +964,49 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                                 
-                                // Send button
+                                // Send/Stop button
                                 Box(
                                     modifier = Modifier
                                         .size(36.dp)
                                         .clip(CircleShape)
                                         .background(
-                                            if (chatState.prompt.isNotEmpty() || bitmap != null) {
+                                            if (chatState.isGeneratingResponse) {
+                                                Color(0xFFFF3B30) // Red when streaming
+                                            } else if (chatState.prompt.isNotEmpty() || bitmap != null) {
                                                 Color(0xFFE5E5E5)
                                             } else {
                                                 Color(0xFF3A3A3C)
                                             }
                                         )
                                         .clickable(
-                                            enabled = chatState.prompt.isNotEmpty() || bitmap != null
+                                            enabled = chatState.isGeneratingResponse || chatState.prompt.isNotEmpty() || bitmap != null
                                         ) {
-                                            chaViewModel.onEvent(
-                                                ChatUiEvent.SendPrompt(
-                                                    chatState.prompt,
-                                                    bitmap
+                                            if (chatState.isGeneratingResponse) {
+                                                // Stop streaming
+                                                chaViewModel.onEvent(ChatUiEvent.StopStreaming)
+                                            } else {
+                                                // Send message
+                                                chaViewModel.onEvent(
+                                                    ChatUiEvent.SendPrompt(
+                                                        chatState.prompt,
+                                                        bitmap
+                                                    )
                                                 )
-                                            )
-                                            uriState.update { "" }
+                                                uriState.update { "" }
+                                            }
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {
-                        Icon(
-                                        imageVector = Icons.Rounded.ArrowUpward,
-                            contentDescription = "Send",
-                                        tint = if (chatState.prompt.isNotEmpty() || bitmap != null) {
+                                    Icon(
+                                        imageVector = if (chatState.isGeneratingResponse) {
+                                            Icons.Rounded.Stop
+                                        } else {
+                                            Icons.Rounded.ArrowUpward
+                                        },
+                                        contentDescription = if (chatState.isGeneratingResponse) "Stop" else "Send",
+                                        tint = if (chatState.isGeneratingResponse) {
+                                            Color.White
+                                        } else if (chatState.prompt.isNotEmpty() || bitmap != null) {
                                             Color(0xFF1C1C1E)
                                         } else {
                                             Color(0xFF8E8E93)
@@ -940,47 +1021,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-    }
-
-//    Typing indicator animation (WhatsApp style)
-    @Composable
-    fun TypingIndicator() {
-        val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "typing")
-        
-        Row(
-            modifier = Modifier
-                .padding(start = 8.dp, end = 50.dp, top = 8.dp, bottom = 8.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(Color(0xFF2C2C2E))
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Three animated dots
-            for (i in 0..2) {
-                val offset by infiniteTransition.animateFloat(
-                    initialValue = 0f,
-                    targetValue = -8f,
-                    animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-                        animation = androidx.compose.animation.core.tween(
-                            durationMillis = 600,
-                            delayMillis = i * 200,
-                            easing = androidx.compose.animation.core.FastOutSlowInEasing
-                        ),
-                        repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
-                    ),
-                    label = "dot_$i"
-                )
-                
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .offset(y = offset.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF8E8E93))
-                )
-            }
-        }
     }
 
 //    user chat text bubble
@@ -1026,25 +1066,90 @@ class MainActivity : ComponentActivity() {
 
     }
 
+    // Syntax highlighting for code blocks
+    @Composable
+    fun HighlightedCodeText(code: String) {
+        val annotatedString = buildAnnotatedString {
+            val text = code.trim()
+            append(text)
+            
+            // Define color scheme
+            val keywordColor = Color(0xFF569CD6)
+            val stringColor = Color(0xFFCE9178)
+            val commentColor = Color(0xFF6A9955)
+            val numberColor = Color(0xFFB5CEA8)
+            val functionColor = Color(0xFFDCDCAA)
+            
+            // Keywords
+            val keywords = listOf(
+                "fun", "val", "var", "class", "object", "interface", "enum", "when", "if", "else", "for", "while", "do",
+                "return", "break", "continue", "try", "catch", "finally", "throw", "import", "package",
+                "public", "private", "protected", "internal", "abstract", "final", "open", "override",
+                "const", "data", "sealed", "inline", "suspend", "lateinit", "companion",
+                "function", "let", "async", "await", "export", "default", "new", "this", "super",
+                "int", "string", "bool", "void", "null", "true", "false", "undefined", "def", "from", "as"
+            )
+            
+            // Apply highlighting patterns
+            val patterns = listOf(
+                Regex("\"([^\"\\\\]|\\\\.)*\"") to stringColor,
+                Regex("'([^'\\\\]|\\\\.)*'") to stringColor,
+                Regex("//.*") to commentColor,
+                Regex("/\\*[\\s\\S]*?\\*/") to commentColor,
+                Regex("#.*") to commentColor,
+                Regex("\\b\\d+(\\.\\d+)?\\b") to numberColor,
+                Regex("\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(") to functionColor,
+                Regex("\\b(${keywords.joinToString("|")})\\b") to keywordColor
+            )
+            
+            patterns.forEach { (pattern, color) ->
+                pattern.findAll(text).forEach { match ->
+                    addStyle(
+                        style = SpanStyle(color = color),
+                        start = match.range.first,
+                        end = match.range.last + 1
+                    )
+                }
+            }
+        }
+        
+        Text(
+            text = annotatedString,
+            style = TextStyle(
+                fontFamily = FontFamily.Monospace,
+                color = Color(0xFFE0E0E0),
+                fontSize = 14.sp
+            ),
+            softWrap = false,
+            maxLines = Int.MAX_VALUE
+        )
+    }
+
     // Custom Markdown renderer with copy buttons for code blocks
     @Composable
     fun MarkdownWithCodeCopy(response: String, context: android.content.Context) {
-        val codeBlockRegex = Regex("```([\\s\\S]*?)```")
-        val parts = mutableListOf<Pair<String, Boolean>>() // Pair<content, isCodeBlock>
-        
-        var lastIndex = 0
-        codeBlockRegex.findAll(response).forEach { match ->
-            // Add text before code block
-            if (match.range.first > lastIndex) {
-                parts.add(Pair(response.substring(lastIndex, match.range.first), false))
+        // Memoize parsed parts to avoid recalculation on every recomposition
+        val parts = remember(response) {
+            val codeBlockRegex = Regex("```(\\w+)?\\n?([\\s\\S]*?)```")
+            val parsedParts = mutableListOf<Triple<String, Boolean, String>>()
+            
+            var lastIndex = 0
+            codeBlockRegex.findAll(response).forEach { match ->
+                // Add text before code block
+                if (match.range.first > lastIndex) {
+                    parsedParts.add(Triple(response.substring(lastIndex, match.range.first), false, ""))
+                }
+                // Add code block with language
+                val language = match.groupValues[1].ifEmpty { "code" }
+                val code = match.groupValues[2]
+                parsedParts.add(Triple(code, true, language))
+                lastIndex = match.range.last + 1
             }
-            // Add code block
-            parts.add(Pair(match.groupValues[1], true))
-            lastIndex = match.range.last + 1
-        }
-        // Add remaining text
-        if (lastIndex < response.length) {
-            parts.add(Pair(response.substring(lastIndex), false))
+            // Add remaining text
+            if (lastIndex < response.length) {
+                parsedParts.add(Triple(response.substring(lastIndex), false, ""))
+            }
+            parsedParts
         }
         
         if (parts.isEmpty()) {
@@ -1061,9 +1166,9 @@ class MainActivity : ComponentActivity() {
         } else {
             // Render parts with code blocks having copy buttons
             Column(modifier = Modifier.fillMaxWidth()) {
-                parts.forEach { (content, isCodeBlock) ->
+                parts.forEach { (content, isCodeBlock, language) ->
                     if (isCodeBlock) {
-                        // Code block with copy button
+                        // Code block with language label and copy button
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1075,19 +1180,27 @@ class MainActivity : ComponentActivity() {
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(Color(0xFF1E1E1E))
                                     .padding(12.dp)
-                                    .horizontalScroll(rememberScrollState())
                             ) {
-                                SelectionContainer {
-                                    Text(
-                                        text = content.trim(),
-                                        style = TextStyle(
-                                            fontFamily = FontFamily.Monospace,
-                                            color = Color(0xFFE0E0E0),
-                                            fontSize = 14.sp
-                                        ),
-                                        softWrap = false,
-                                        maxLines = Int.MAX_VALUE
-                                    )
+                                // Language label
+                                Text(
+                                    text = language,
+                                    style = TextStyle(
+                                        color = Color(0xFF8E8E93),
+                                        fontSize = 12.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    ),
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                                
+                                // Code with horizontal scroll
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState())
+                                ) {
+                                    SelectionContainer {
+                                        HighlightedCodeText(code = content.trim())
+                                    }
                                 }
                             }
                             // Copy button overlay
@@ -1135,30 +1248,40 @@ class MainActivity : ComponentActivity() {
     fun ModelChatItem(
         response: String,
         modelUsed: String = "",
-        onRetry: (String) -> Unit = {}
+        onRetry: (String) -> Unit = {},
+        isStreaming: Boolean = false,
+        freeModels: List<ModelInfo> = emptyList()
     ) {
         val context = LocalContext.current
         var showModelSelector by remember { mutableStateOf(false) }
         
-        // Get current free models
-        var freeModels by remember { mutableStateOf<List<ModelInfo>>(emptyList()) }
-        LaunchedEffect(Unit) {
-            freeModels = ChatData.fetchFreeModels()
+        // Haptic feedback for streaming
+        val hapticFeedback = androidx.compose.ui.platform.LocalHapticFeedback.current
+        
+        // Trigger haptic when streaming starts
+        LaunchedEffect(isStreaming) {
+            if (isStreaming) {
+                hapticFeedback.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+            }
         }
         
-        // Extract brand name from model (e.g., "deepseek/deepseek-chat-v3.1" -> "Deepseek")
-        val brandName = if (modelUsed.isNotEmpty()) {
-            val brand = modelUsed.substringBefore("/")
-            brand.split("-", "_").firstOrNull()?.replaceFirstChar { it.uppercase() } 
-                ?: brand.replaceFirstChar { it.uppercase() }
-        } else {
-            ""
+        // Extract brand name from model (memoized)
+        val brandName = remember(modelUsed) {
+            if (modelUsed.isNotEmpty()) {
+                val brand = modelUsed.substringBefore("/")
+                brand.split("-", "_").firstOrNull()?.replaceFirstChar { it.uppercase() } 
+                    ?: brand.replaceFirstChar { it.uppercase() }
+            } else {
+                ""
+            }
         }
         
-        val headerText = if (brandName.isNotEmpty()) {
-            "Mark VII  x  $brandName"
-        } else {
-            "Mark VII"
+        val headerText = remember(brandName) {
+            if (brandName.isNotEmpty()) {
+                "Mark VII  x  $brandName"
+            } else {
+                "Mark VII"
+            }
         }
         
         Column(
@@ -1187,6 +1310,64 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.padding(top = 2.dp)
                         )
                     }
+                    
+                    // Show blinking cursor when streaming (moved below header)
+                    if (isStreaming) {
+                        // Blinking cursor animation - only created when streaming
+                        val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "cursor")
+                        val cursorAlpha by infiniteTransition.animateFloat(
+                            initialValue = 0.3f,
+                            targetValue = 1f,
+                            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                                animation = androidx.compose.animation.core.tween(
+                                    durationMillis = 800,
+                                    easing = androidx.compose.animation.core.FastOutSlowInEasing
+                                ),
+                                repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                            ),
+                            label = "cursor_blink"
+                        )
+                        
+                        val cursorScale by infiniteTransition.animateFloat(
+                            initialValue = 0.95f,
+                            targetValue = 1.05f,
+                            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                                animation = androidx.compose.animation.core.tween(
+                                    durationMillis = 800,
+                                    easing = androidx.compose.animation.core.FastOutSlowInEasing
+                                ),
+                                repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                            ),
+                            label = "cursor_scale"
+                        )
+                        
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(end = 4.dp)
+                                    .alpha(cursorAlpha)
+                                    .graphicsLayer(
+                                        scaleX = cursorScale,
+                                        scaleY = cursorScale
+                                    )
+                            ) {
+                                Text(
+                                    text = "▋",
+                                    color = Color(0xFF569CD6),
+                                    fontSize = 16.sp
+                                )
+                            }
+                            Text(
+                                text = "Generating response...",
+                                fontSize = 12.sp,
+                                color = Color(0xFF8E8E93)
+                            )
+                        }
+                    }
+                    
                     Spacer(modifier = Modifier.height(8.dp))
                     
                     // Render markdown with code block enhancements
@@ -1194,7 +1375,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
             
-            // Action buttons row
+            // Action buttons row - only show when response is complete
+            if (!isStreaming && response.isNotEmpty()) {
             Row(
                 modifier = Modifier
                     .padding(start = 8.dp, top = 4.dp)
@@ -1306,6 +1488,7 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
+            }
             
             // Model selector dialog for retry
             if (showModelSelector) {
@@ -1399,7 +1582,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun getBitmap(): Bitmap? {
+    fun getSelectedBitmap(): Bitmap? {
         val uri = uriState.collectAsState().value
 
         val imageState: AsyncImagePainter.State = rememberAsyncImagePainter(
