@@ -19,16 +19,6 @@ data class ModelInfo(
     val isAvailable: Boolean = true
 )
 
-/**
- * Configuration class for all AI models via OpenRouter
- * Models are now loaded ONLY from Firebase - no hardcoded models
- */
-object ModelConfiguration {
-    // Empty list - all models must come from Firebase
-    // NO hardcoded models - app requires Firebase configuration
-    val models = emptyList<ModelInfo>()
-}
-
 object ChatData {
 
     // API key loaded ONLY from Firebase - no local fallback
@@ -77,7 +67,7 @@ object ChatData {
                 
                 // Free models have 0 cost for both prompt and completion
                 promptPrice == 0.0 && completionPrice == 0.0
-            }.mapIndexed { index, model ->
+            }.mapIndexed { _, model ->
                 // Clean up display name but keep original model ID
                 val cleanDisplayName = (model.name ?: model.id)
                     .replace("(free)", "", ignoreCase = true)

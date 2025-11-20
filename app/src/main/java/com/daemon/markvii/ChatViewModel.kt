@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.security.AccessController.getContext
 
 /**
  * @author Nitesh
@@ -169,14 +168,13 @@ class ChatViewModel : ViewModel() {
         val parts = errorMessage.split("|", limit = 2)
         
         val errorCode = if (parts.size == 2) parts[0] else "UNKNOWN_ERROR"
-        val errorDetails = if (parts.size == 2) parts[1] else errorMessage
         
         // Use only the API error message, not the stack trace
         val apiErrorLog = buildString {
             appendLine("Error Code: $errorCode")
             appendLine("")
             appendLine("Details:")
-            appendLine(errorDetails)
+            appendLine(if (parts.size == 2) parts[1] else errorMessage)
         }
         
         val (title, mainMessage, isRetryable) = when (errorCode) {
@@ -231,7 +229,7 @@ class ChatViewModel : ViewModel() {
                     isRetryable = isRetryable,
                     lastPrompt = prompt,
                     lastBitmap = bitmap,
-                    rawException = errorDetails
+                    rawException = e.stackTraceToString()
                 )
             )
         }

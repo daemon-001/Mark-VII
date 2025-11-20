@@ -22,6 +22,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,17 +46,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.AddAPhoto
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Mic
-import androidx.compose.material.icons.rounded.Send
-import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Share
-import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -84,8 +80,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -97,6 +91,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
@@ -115,10 +110,8 @@ import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.daemon.markvii.data.Chat
 import com.daemon.markvii.data.ChatData
-import com.daemon.markvii.data.ModelConfiguration
 import com.daemon.markvii.data.ModelInfo
 import com.daemon.markvii.data.FirebaseConfigManager
-import com.daemon.markvii.data.FirebaseModelInfo
 import com.daemon.markvii.ui.theme.MarkVIITheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -151,7 +144,7 @@ class MainActivity : ComponentActivity() {
             val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
             spokenText?.let {
                 if (it.isNotEmpty()) {
-                    voiceInputState.update { text -> it[0] }
+                    voiceInputState.update { _ -> it[0] }
                 }
             }
             }
@@ -191,7 +184,6 @@ class MainActivity : ComponentActivity() {
                             Scaffold(
 //                                top bar items
                                 topBar = {
-                                var context = LocalContext.current
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -384,7 +376,6 @@ class MainActivity : ComponentActivity() {
         val bitmap = getBitmap()
         val voiceInput = voiceInputState.collectAsState().value
         val context = LocalContext.current
-        val scope = rememberCoroutineScope()
         
         // State for loading free models from OpenRouter
         var isLoadingModels by remember { mutableStateOf(false) }
@@ -501,12 +492,11 @@ class MainActivity : ComponentActivity() {
         }
 
 
-        BigHi() // chat screen background ui function
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = paddingValues.calculateTopPadding())
-        ) {
+                .background(Color.Black)
+                .padding(top = paddingValues.calculateTopPadding())) {
 //            Chat messages list - extends to bottom of screen
             Box(
                 modifier = Modifier
@@ -540,9 +530,7 @@ class MainActivity : ComponentActivity() {
                             ModelChatItem(
                                 response = chat.prompt,
                                 modelUsed = chat.modelUsed,
-                                userPrompt = previousUserChat?.prompt ?: "",
-                                userBitmap = previousUserChat?.bitmap,
-                                onRetry = { newModel ->
+                                onRetry = { _ ->
                                     chaViewModel.onEvent(
                                         ChatUiEvent.RetryPrompt(
                                             previousUserChat?.prompt ?: "",
@@ -1038,17 +1026,118 @@ class MainActivity : ComponentActivity() {
 
     }
 
+    // Custom Markdown renderer with copy buttons for code blocks
+    @Composable
+    fun MarkdownWithCodeCopy(response: String, context: android.content.Context) {
+        val codeBlockRegex = Regex("```([\\s\\S]*?)```")
+        val parts = mutableListOf<Pair<String, Boolean>>() // Pair<content, isCodeBlock>
+        
+        var lastIndex = 0
+        codeBlockRegex.findAll(response).forEach { match ->
+            // Add text before code block
+            if (match.range.first > lastIndex) {
+                parts.add(Pair(response.substring(lastIndex, match.range.first), false))
+            }
+            // Add code block
+            parts.add(Pair(match.groupValues[1], true))
+            lastIndex = match.range.last + 1
+        }
+        // Add remaining text
+        if (lastIndex < response.length) {
+            parts.add(Pair(response.substring(lastIndex), false))
+        }
+        
+        if (parts.isEmpty()) {
+            // No code blocks, render normal markdown
+            MarkdownText(
+                markdown = response,
+                modifier = Modifier.fillMaxWidth(),
+                style = TextStyle(
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    lineHeight = 22.sp
+                )
+            )
+        } else {
+            // Render parts with code blocks having copy buttons
+            Column(modifier = Modifier.fillMaxWidth()) {
+                parts.forEach { (content, isCodeBlock) ->
+                    if (isCodeBlock) {
+                        // Code block with copy button
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFF1E1E1E))
+                                    .padding(12.dp)
+                                    .horizontalScroll(rememberScrollState())
+                            ) {
+                                SelectionContainer {
+                                    Text(
+                                        text = content.trim(),
+                                        style = TextStyle(
+                                            fontFamily = FontFamily.Monospace,
+                                            color = Color(0xFFE0E0E0),
+                                            fontSize = 14.sp
+                                        ),
+                                        softWrap = false,
+                                        maxLines = Int.MAX_VALUE
+                                    )
+                                }
+                            }
+                            // Copy button overlay
+                            IconButton(
+                                onClick = {
+                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                    val clip = android.content.ClipData.newPlainText("Code", content.trim())
+                                    clipboard.setPrimaryClip(clip)
+                                    Toast.makeText(context, "Code copied", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(4.dp)
+                                    .size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.ContentCopy,
+                                    contentDescription = "Copy code",
+                                    tint = Color(0xFF8E8E93),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        // Regular markdown text
+                        if (content.isNotBlank()) {
+                            MarkdownText(
+                                markdown = content,
+                                modifier = Modifier.fillMaxWidth(),
+                                style = TextStyle(
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    lineHeight = 22.sp
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 //    model chat text bubble
     @Composable
     fun ModelChatItem(
         response: String,
         modelUsed: String = "",
-        userPrompt: String = "",
-        userBitmap: Bitmap? = null,
         onRetry: (String) -> Unit = {}
     ) {
         val context = LocalContext.current
-        val scope = rememberCoroutineScope()
         var showModelSelector by remember { mutableStateOf(false) }
         
         // Get current free models
@@ -1073,40 +1162,35 @@ class MainActivity : ComponentActivity() {
         }
         
         Column(
-            modifier = Modifier.padding(end = 8.dp, top = 8.dp, bottom = 8.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(end = 8.dp, top = 8.dp, bottom = 8.dp)
         ) {
-//            model response text display with Markdown support
+//            model response text display with Markdown support - no bubble
             SelectionContainer() {
-                Box(
+                Column(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color.Black)
-                        .padding(16.dp),
-                ){
-                    Column {
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = headerText,
+                        fontSize = 18.sp,
+                        fontFamily = FontFamily(Font(R.font.typographica)),
+                        color = Color.White
+                    )
+                    if (modelUsed.isNotEmpty()) {
                         Text(
-                            text = headerText,
-                            fontSize = 18.sp,
-                            fontFamily = FontFamily(Font(R.font.typographica)),
-                            color = Color.White
-                        )
-                        if (modelUsed.isNotEmpty()) {
-                            Text(
-                                text = modelUsed.replace(":free", ""),
-                                fontSize = 12.sp,
-                                color = Color(0xFF8E8E93),
-                                modifier = Modifier.padding(top = 2.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        MarkdownText(
-                            markdown = response,
-                            color = Color.White,
-                            modifier = Modifier.fillMaxWidth(),
-                            fontSize = 16.sp,
-                            lineHeight = 22.sp
+                            text = modelUsed.replace(":free", ""),
+                            fontSize = 12.sp,
+                            color = Color(0xFF8E8E93),
+                            modifier = Modifier.padding(top = 2.dp)
                         )
                     }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Render markdown with code block enhancements
+                    MarkdownWithCodeCopy(response = response, context = context)
                 }
             }
             
@@ -1180,7 +1264,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.VolumeUp,
+                        imageVector = Icons.AutoMirrored.Rounded.VolumeUp,
                         contentDescription = "Speak",
                         tint = Color(0xFF8E8E93),
                         modifier = Modifier.size(18.dp)
@@ -1252,7 +1336,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                             } else {
-                                itemsIndexed(freeModels) { index, model ->
+                                itemsIndexed(freeModels) { _, model ->
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -1331,177 +1415,6 @@ class MainActivity : ComponentActivity() {
 
         return null
     }
-
-//    Dropdown menu of nlp models
-    @Composable
-    fun DropDownDemo() {
-        val isDropDownExpanded = remember { mutableStateOf(false) }
-        val itemPosition = remember { mutableStateOf(0) }
-        val scope = rememberCoroutineScope()
-        
-        // Observe Firebase models and API key
-        val firebaseModels by FirebaseConfigManager.models.collectAsState()
-        val firebaseApiKey by FirebaseConfigManager.apiKey.collectAsState()
-        val configState by FirebaseConfigManager.configState.collectAsState()
-        
-        // Use ONLY Firebase models - no local fallback
-        val currentModels = if (firebaseModels.isNotEmpty()) {
-            firebaseModels.map { ModelInfo(it.displayName, it.apiModel, it.isAvailable) }
-        } else {
-            // If Firebase not configured, show empty list
-            emptyList()
-        }
-        
-        // Update API key when Firebase data changes
-        LaunchedEffect(firebaseApiKey) {
-            if (firebaseApiKey.isNotEmpty()) {
-                ChatData.updateApiKey(firebaseApiKey)
-            }
-        }
-        
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.Start,
-        verticalArrangement = Arrangement.Center
-    ) {
-
-        Box {
-            Row(
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable {
-                    isDropDownExpanded.value = true
-                }
-            ) {
-
-                // Show loading indicator, model name, or error message
-                when (configState) {
-                    is FirebaseConfigManager.ConfigState.Loading -> {
-                        Text(
-                            text = "Loading...",
-                            fontSize = 20.sp,
-                            fontFamily = FontFamily(Font(R.font.typographica)),
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-                    is FirebaseConfigManager.ConfigState.Error -> {
-                        Text(
-                            text = "Firebase Required",
-                            fontSize = 16.sp,
-                            fontFamily = FontFamily(Font(R.font.typographica)),
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                    else -> {
-                        if (currentModels.isNotEmpty() && itemPosition.value < currentModels.size) {
-                            Text(
-                                text = currentModels[itemPosition.value].displayName,
-                                fontSize = 18.sp,
-                                fontFamily = FontFamily(Font(R.font.typographica)),
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                        } else {
-                            Text(
-                                text = "Setup Firebase",
-                                fontSize = 16.sp,
-                                fontFamily = FontFamily(Font(R.font.typographica)),
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
-                }
-                
-                Image(
-                    painter = painterResource(id = R.drawable.drop_down_ic),
-                    contentDescription = "DropDown Icon"
-                )
-
-                // Set initial model
-                if (currentModels.isNotEmpty() && itemPosition.value < currentModels.size) {
-                    ChatData.selected_model = currentModels[itemPosition.value].apiModel
-                }
-            }
-
-            DropdownMenu(
-                expanded = isDropDownExpanded.value,
-                onDismissRequest = {
-                    isDropDownExpanded.value = false
-                }) {
-                val context = LocalContext.current
-
-                if (currentModels.isEmpty()) {
-                    // Show message when Firebase not configured
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = "⚠️ Firebase not configured\nPlease set up Firebase with models and API key",
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        },
-                        onClick = {
-                            isDropDownExpanded.value = false
-                            Toast.makeText(context, "Please configure Firebase first", Toast.LENGTH_LONG).show()
-                        }
-                    )
-                } else {
-                    currentModels.forEachIndexed { index, model ->
-                        DropdownMenuItem(
-                            text = {
-                                Text(text = model.displayName)
-                            },
-                            onClick = {
-                                isDropDownExpanded.value = false
-                                itemPosition.value = index
-                                
-                                // Update the selected model
-                                ChatData.selected_model = model.apiModel
-
-                                // Handle unavailable models
-                                if (!model.isAvailable) {
-                                    Toast.makeText(context, "Model temporarily unavailable", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-
-
-    }
-
-
-
-// chat screen backgrounds
-    @Composable
-    fun BigHi(modifier: Modifier = Modifier) {
-        Box(
-            modifier
-                .fillMaxSize()
-                .background(Color.Black),
-            contentAlignment = Alignment.Center
-        )  {
-
-//            Startup big hi  animation
-            val composition by rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.gassist))
-            LottieAnimation(
-                composition = composition,
-                modifier = Modifier
-                    .size(500.dp)
-                    .align(Alignment.Center)
-                    .alpha(0.3f)
-//                iterations = LottieConstants.IterateForever // Play in loop
-//                progress = {}
-            )
-
-
-        }
-    }
-
-
-
 
 
 }
