@@ -5,7 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.daemon.markvii.data.Chat
 import com.daemon.markvii.data.ChatData
+import com.daemon.markvii.data.ChatHistoryManager
 import com.daemon.markvii.data.ErrorInfo
+import com.daemon.markvii.data.GeminiClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -21,6 +23,11 @@ class ChatViewModel : ViewModel() {
     val chatState = _chatState.asStateFlow()
     
     private var streamingJob: Job? = null
+    
+    init {
+        // Load chat history when ViewModel is created
+        loadChatHistory()
+    }
 
     fun onEvent(event: ChatUiEvent) {
 
@@ -41,6 +48,9 @@ class ChatViewModel : ViewModel() {
             is ChatUiEvent.RetryPrompt -> {
                 // Retry without adding prompt to chat again
                 if (event.prompt.isNotEmpty()) {
+                    // Set generating state immediately for instant UI feedback
+                    _chatState.update { it.copy(isGeneratingResponse = true) }
+                    
                     if (event.bitmap != null) {
                         getResponseWithImage(event.prompt, event.bitmap)
                     } else {
@@ -70,6 +80,12 @@ class ChatViewModel : ViewModel() {
                     )
                 }
             }
+            
+            is ChatUiEvent.SwitchApiProvider -> {
+                _chatState.update {
+                    it.copy(currentApiProvider = event.provider)
+                }
+            }
         }
     }
     
@@ -84,44 +100,51 @@ class ChatViewModel : ViewModel() {
 
 //    Show welcome guide without making API call
     fun showWelcomeGuide() {
-        val welcomeMessage = """
-            👋 Welcome to Mark VII!
-            
-            🚀 Quick Start Guide:
-            
-            1️⃣ SELECT MODEL
-               • Tap the model dropdown at the top
-               • Choose from FREE AI models powered by OpenRouter
-            
-            2️⃣ START CHATTING
-               • Type your message in the text box
-               • Tap the send button (✈️)
-               • Get instant AI responses
-            
-            3️⃣ IMAGE UNDERSTANDING
-               • Tap the 📷 icon to attach images
-               • Ask questions about the image
-               • AI will analyze and respond
-            
-            💡 Tips:
-               • All models are FREE to use
-               • Different models have different strengths
-            
-            ✨ Ready to start? Just type your first message!
-        """.trimIndent()
-        
-        val welcomeChat = Chat(
-            prompt = welcomeMessage,
-            bitmap = null,
-            isFromUser = false,
-            modelUsed = "" // Welcome guide has no model
-        )
-        
+        // Just enable prompt suggestions, no chat message needed
         _chatState.update {
             it.copy(
-                chatList = it.chatList.toMutableList().apply {
-                    add(0, welcomeChat)
-                }
+                showPromptSuggestions = true
+            )
+        }
+    }
+    
+    fun dismissPromptSuggestions() {
+        _chatState.update {
+            it.copy(showPromptSuggestions = false)
+        }
+    }
+    
+    /**
+     * Load chat history from persistent storage
+     */
+    private fun loadChatHistory() {
+        val savedChats = ChatHistoryManager.loadChatHistory()
+        if (savedChats.isNotEmpty()) {
+            _chatState.update {
+                it.copy(
+                    chatList = savedChats.toMutableList(),
+                    showPromptSuggestions = false // Don't show suggestions if history exists
+                )
+            }
+        }
+    }
+    
+    /**
+     * Save chat history to persistent storage
+     */
+    private fun saveChatHistory() {
+        ChatHistoryManager.saveChatHistory(_chatState.value.chatList)
+    }
+    
+    /**
+     * Clear all chat history
+     */
+    fun clearChatHistory() {
+        ChatHistoryManager.clearChatHistory()
+        _chatState.update {
+            it.copy(
+                chatList = mutableListOf(),
+                showPromptSuggestions = true
             )
         }
     }
@@ -133,63 +156,136 @@ class ChatViewModel : ViewModel() {
                     add(0, Chat(prompt, bitmap, true))
                 },
                 prompt = "",
-                bitmap = null
+                bitmap = null,
+                showPromptSuggestions = false,
+                isGeneratingResponse = true // Set immediately for instant UI feedback
             )
         }
+        saveChatHistory() // Save after adding prompt
     }
 
     private fun getResponse(prompt: String) {
         streamingJob = viewModelScope.launch {
             try {
-                // Set loading state
-                _chatState.update { it.copy(isGeneratingResponse = true) }
+                // Determine which API to use
+                val currentProvider = _chatState.value.currentApiProvider
                 
-                // Create a placeholder chat for streaming response
-                val streamingChat = Chat(
-                    prompt = "",
-                    bitmap = null,
-                    isFromUser = false,
-                    modelUsed = ChatData.selected_model,
-                    isStreaming = true
-                )
-                
-                // Add placeholder to chat list
-                _chatState.update {
-                    it.copy(
-                        chatList = it.chatList.toMutableList().apply {
-                            add(0, streamingChat)
-                        }
-                    )
-                }
-                
-                // Use streaming to get response with live updates
-                var chunkCount = 0
-                val chat = ChatData.getStreamingResponse(prompt) { chunk ->
-                    chunkCount++
-                    // Update the streaming chat with each chunk
-                    _chatState.update { state ->
-                        val updatedList = state.chatList.toMutableList()
-                        if (updatedList.isNotEmpty()) {
-                            val currentResponse = updatedList[0]
-                            updatedList[0] = currentResponse.copy(
-                                prompt = currentResponse.prompt + chunk,
-                                isStreaming = true
+                when (currentProvider) {
+                    ApiProvider.GEMINI -> {
+                        // Use Gemini API with streaming
+                        val streamingChat = Chat(
+                            prompt = "",
+                            bitmap = null,
+                            isFromUser = false,
+                            modelUsed = ChatData.selected_model,
+                            isStreaming = true
+                        )
+                        
+                        _chatState.update {
+                            it.copy(
+                                chatList = it.chatList.toMutableList().apply {
+                                    add(0, streamingChat)
+                                }
                             )
                         }
-                        state.copy(chatList = updatedList)
+                        
+                        GeminiClient.generateContentStream(
+                            prompt = prompt,
+                            modelName = ChatData.selected_model,
+                            onChunk = { chunk ->
+                                _chatState.update { state ->
+                                    val updatedList = state.chatList.toMutableList()
+                                    if (updatedList.isNotEmpty()) {
+                                        val currentResponse = updatedList[0]
+                                        updatedList[0] = currentResponse.copy(
+                                            prompt = currentResponse.prompt + chunk,
+                                            isStreaming = true
+                                        )
+                                    }
+                                    state.copy(
+                                        chatList = updatedList,
+                                        hapticTrigger = System.currentTimeMillis() // Trigger haptic on chunk
+                                    )
+                                }
+                            },
+                            onFinish = { finishReason ->
+                                // Mark streaming as complete
+                                _chatState.update { state ->
+                                    val updatedList = state.chatList.toMutableList()
+                                    if (updatedList.isNotEmpty()) {
+                                        val currentResponse = updatedList[0]
+                                        
+                                        // Check if response was truncated due to max tokens
+                                        val finalPrompt = if (finishReason == "MAX_TOKENS") {
+                                            currentResponse.prompt + "\n\n⚠️ Response truncated: Maximum token limit reached. Try asking for a shorter response or continue the conversation."
+                                        } else {
+                                            currentResponse.prompt
+                                        }
+                                        
+                                        updatedList[0] = currentResponse.copy(
+                                            prompt = finalPrompt,
+                                            isStreaming = false
+                                        )
+                                    }
+                                    state.copy(
+                                        chatList = updatedList,
+                                        isGeneratingResponse = false
+                                    )
+                                }
+                                saveChatHistory()
+                            }
+                        )
                     }
-                }
-                
-                // Update with final response (stop streaming)
-                _chatState.update { state ->
-                    val updatedList = state.chatList.toMutableList()
-                    if (updatedList.isNotEmpty()) {
-                        updatedList[0] = chat.copy(isStreaming = false)
+                    
+                    ApiProvider.OPENROUTER -> {
+                        // Use OpenRouter API with streaming (existing code)
+                        val streamingChat = Chat(
+                            prompt = "",
+                            bitmap = null,
+                            isFromUser = false,
+                            modelUsed = ChatData.selected_model,
+                            isStreaming = true
+                        )
+                        
+                        _chatState.update {
+                            it.copy(
+                                chatList = it.chatList.toMutableList().apply {
+                                    add(0, streamingChat)
+                                }
+                            )
+                        }
+                        
+                        var chunkCount = 0
+                        val chat = ChatData.getStreamingResponse(prompt) { chunk ->
+                            chunkCount++
+                            _chatState.update { state ->
+                                val updatedList = state.chatList.toMutableList()
+                                if (updatedList.isNotEmpty()) {
+                                    val currentResponse = updatedList[0]
+                                    updatedList[0] = currentResponse.copy(
+                                        prompt = currentResponse.prompt + chunk,
+                                        isStreaming = true
+                                    )
+                                }
+                                state.copy(
+                                    chatList = updatedList,
+                                    hapticTrigger = System.currentTimeMillis() // Trigger haptic on chunk
+                                )
+                            }
+                        }
+                        
+                        _chatState.update { state ->
+                            val updatedList = state.chatList.toMutableList()
+                            if (updatedList.isNotEmpty()) {
+                                updatedList[0] = chat.copy(isStreaming = false)
+                            }
+                            state.copy(
+                                chatList = updatedList,
+                                isGeneratingResponse = false
+                            )
+                        }
+                        saveChatHistory()
                     }
-                    state.copy(
-                        chatList = updatedList,
-                        isGeneratingResponse = false
-                    )
                 }
             } catch (e: Exception) {
                 // Remove the placeholder chat on error
@@ -211,18 +307,53 @@ class ChatViewModel : ViewModel() {
     private fun getResponseWithImage(prompt: String, bitmap: Bitmap) {
         streamingJob = viewModelScope.launch {
             try {
-                // Set loading state
-                _chatState.update { it.copy(isGeneratingResponse = true) }
+                // Add streaming placeholder
+                val streamingChat = Chat(
+                    prompt = "",
+                    bitmap = null,
+                    isFromUser = false,
+                    modelUsed = ChatData.selected_model,
+                    isStreaming = true
+                )
                 
-                val chat = ChatData.getResponseWithImage(prompt, bitmap)
-                _chatState.update {
+                _chatState.update { 
                     it.copy(
                         chatList = it.chatList.toMutableList().apply {
-                            add(0, chat)
-                        },
+                            add(0, streamingChat)
+                        }
+                    ) 
+                }
+                
+                // Determine which API to use
+                val currentProvider = _chatState.value.currentApiProvider
+                
+                val chat = when (currentProvider) {
+                    ApiProvider.GEMINI -> {
+                        // Use Gemini API for image understanding
+                        GeminiClient.generateContentWithImage(
+                            prompt = prompt,
+                            bitmap = bitmap,
+                            modelName = ChatData.selected_model
+                        )
+                    }
+                    ApiProvider.OPENROUTER -> {
+                        // OpenRouter no longer supports image processing
+                        throw Exception("IMAGE_NOT_SUPPORTED|Image processing is only available with Gemini API. Please switch to Gemini to use this feature.")
+                    }
+                }
+                
+                // Replace streaming placeholder with actual response
+                _chatState.update { state ->
+                    val updatedList = state.chatList.toMutableList()
+                    if (updatedList.isNotEmpty() && updatedList[0].isStreaming) {
+                        updatedList[0] = chat.copy(isStreaming = false)
+                    }
+                    state.copy(
+                        chatList = updatedList,
                         isGeneratingResponse = false
                     )
                 }
+                saveChatHistory() // Save after image response
             } catch (e: Exception) {
                 _chatState.update { it.copy(isGeneratingResponse = false) }
                 handleError(e, prompt, bitmap)
@@ -235,136 +366,34 @@ class ChatViewModel : ViewModel() {
         val parts = errorMessage.split("|", limit = 2)
         
         val errorCode = if (parts.size == 2) parts[0] else "UNKNOWN_ERROR"
+        val errorDetails = if (parts.size == 2) parts[1] else errorMessage
         
-        // Use only the API error message, not the stack trace
-        val apiErrorLog = buildString {
-            appendLine("Error Code: $errorCode")
-            appendLine("")
-            appendLine("Details:")
-            appendLine(if (parts.size == 2) parts[1] else errorMessage)
+        // Format error message for display in chat
+        val formattedError = buildString {
+            appendLine("❌ Error: $errorCode")
+            appendLine()
+            appendLine(errorDetails)
         }
         
-        val (title, mainMessage, isRetryable) = when (errorCode) {
-            "API_KEY_MISSING" -> Triple(
-                "Configuration Error",
-                "API key is not configured",
-                false
-            )
-            "BAD_REQUEST" -> Triple(
-                "Error Code: 400",
-                "Invalid or missing params, CORS",
-                true
-            )
-            "UNAUTHORIZED" -> Triple(
-                "Error Code: 401",
-                "Invalid credentials (OAuth session expired, disabled/invalid API key)",
-                false
-            )
-            "INSUFFICIENT_CREDITS" -> Triple(
-                "Error Code: 402",
-                "Your account or API key has insufficient credits. Add more credits and retry the request.",
-                false
-            )
-            "CONTENT_FLAGGED" -> Triple(
-                "Error Code: 403",
-                "Your chosen model requires moderation and your input was flagged",
-                false
-            )
-            "REQUEST_TIMEOUT" -> Triple(
-                "Error Code: 408",
-                "Your request timed out",
-                true
-            )
-            "RATE_LIMITED" -> Triple(
-                "Error Code: 429",
-                "You are being rate limited",
-                true
-            )
-            "MODEL_DOWN" -> Triple(
-                "Error Code: 502",
-                "Your chosen model is down or we received an invalid response from it",
-                true
-            )
-            "MODEL_404_RETRY" -> Triple(
-                "Model Fixed",
-                "Model ID corrected. Please retry your request.",
-                true
-            )
-            "MODEL_NOT_FOUND" -> Triple(
-                "Error Code: 404",
-                "Model not available on server",
-                false
-            )
-            "NO_PROVIDER" -> Triple(
-                "Error Code: 503",
-                "There is no available model provider that meets your routing requirements",
-                true
-            )
-            "TIMEOUT" -> Triple(
-                "Connection Timeout",
-                "Request timed out. Check your connection",
-                true
-            )
-            "NO_INTERNET" -> Triple(
-                "No Internet",
-                "No internet connection available",
-                true
-            )
-            "CONNECTION_FAILED" -> Triple(
-                "Connection Failed",
-                "Could not connect to server",
-                true
-            )
-            "NETWORK_ERROR" -> Triple(
-                "Network Error",
-                "Unable to connect to AI service",
-                true
-            )
-            "HTTP_401" -> Triple(
-                "Error Code: 401",
-                "Invalid or missing API key",
-                false
-            )
-            "HTTP_403" -> Triple(
-                "Error Code: 403",
-                "Insufficient credits or permissions",
-                false
-            )
-            "HTTP_404" -> Triple(
-                "Model Not Found",
-                "The selected AI model is not available",
-                false
-            )
-            "HTTP_429" -> Triple(
-                "Error Code: 429",
-                "Too many requests. Please wait a moment.",
-                true
-            )
-            "API_ERROR" -> Triple(
-                "API Error",
-                "An error occurred with the AI service",
-                true
-            )
-            else -> Triple(
-                "Unknown Error",
-                "An unexpected error occurred",
-                true
-            )
-        }
+        // Add error as a chat message with red text
+        val errorChat = Chat(
+            prompt = formattedError,
+            bitmap = null,
+            isFromUser = false,
+            modelUsed = ChatData.selected_model, // Show the model that was used for the query
+            isStreaming = false,
+            isError = true
+        )
         
         _chatState.update {
             it.copy(
-                error = ErrorInfo(
-                    title = title,
-                    mainMessage = mainMessage,
-                    fullDetails = apiErrorLog,
-                    isRetryable = isRetryable,
-                    lastPrompt = prompt,
-                    lastBitmap = bitmap,
-                    rawException = e.stackTraceToString()
-                )
+                chatList = it.chatList.toMutableList().apply {
+                    add(0, errorChat)
+                },
+                isGeneratingResponse = false
             )
         }
+        saveChatHistory()
     }
 
 }

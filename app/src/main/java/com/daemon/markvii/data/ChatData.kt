@@ -63,6 +63,9 @@ object ChatData {
             
             val allModels = fetchAvailableModels()
             
+            // Use a map to deduplicate models by base ID (without :free suffix)
+            val uniqueModels = mutableMapOf<String, ModelInfo>()
+            
             allModels.filter { model ->
                 val pricing = model.pricing
                 val promptPrice = pricing?.prompt?.toDoubleOrNull() ?: 1.0
@@ -70,15 +73,17 @@ object ChatData {
                 
                 // Free models have 0 cost for both prompt and completion
                 promptPrice == 0.0 && completionPrice == 0.0
-            }.map { model ->
+            }.forEach { model ->
                 // Clean up display name
                 val cleanDisplayName = (model.name ?: model.id)
                     .replace("(free)", "", ignoreCase = true)
                     .replace("  ", " ")
                     .trim()
                 
-                // Check if this model (without :free) is in exception list
+                // Get base model ID without :free suffix for deduplication
                 val modelIdWithoutFree = model.id.replace(":free", "", ignoreCase = true)
+                
+                // Check if this model (without :free) is in exception list
                 val isInExceptionList = exceptionModelsMap.keys.any { exceptionId ->
                     val exceptionIdWithoutFree = exceptionId.replace(":free", "", ignoreCase = true)
                     exceptionIdWithoutFree.equals(modelIdWithoutFree, ignoreCase = true)
@@ -87,8 +92,8 @@ object ChatData {
                 // Determine final API model ID
                 val cleanApiModel = if (isInExceptionList) {
                     // Keep or add :free postfix for exception models
-                    if (modelIdWithoutFree.endsWith(":free", ignoreCase = true)) {
-                        modelIdWithoutFree
+                    if (model.id.endsWith(":free", ignoreCase = true)) {
+                        model.id
                     } else {
                         "$modelIdWithoutFree:free"
                     }
@@ -97,12 +102,17 @@ object ChatData {
                     modelIdWithoutFree
                 }
                 
-                ModelInfo(
-                    displayName = cleanDisplayName,
-                    apiModel = cleanApiModel,
-                    isAvailable = true
-                )
+                // Only add if not already present (deduplication by base ID)
+                if (!uniqueModels.containsKey(modelIdWithoutFree)) {
+                    uniqueModels[modelIdWithoutFree] = ModelInfo(
+                        displayName = cleanDisplayName,
+                        apiModel = cleanApiModel,
+                        isAvailable = true
+                    )
+                }
             }
+            
+            uniqueModels.values.toList()
         } catch (e: Exception) {
             emptyList()
         }

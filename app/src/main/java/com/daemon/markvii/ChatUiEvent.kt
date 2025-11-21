@@ -17,6 +17,7 @@ sealed class ChatUiEvent {
         val bitmap: Bitmap?
     ) : ChatUiEvent()
     object StopStreaming : ChatUiEvent()
+    data class SwitchApiProvider(val provider: ApiProvider) : ChatUiEvent()
 }
 
 

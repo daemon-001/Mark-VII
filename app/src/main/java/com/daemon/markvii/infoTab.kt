@@ -103,7 +103,7 @@ fun InfoSetting() {
                 modifier = Modifier
                     .padding(start = 10.dp, top = 20.dp),
 //                    textAlign = TextAlign.Right,
-                text = "App Version: v1.1",
+                text = "App Version: v3.0",
                 fontFamily = FontFamily(Font(R.font.typographica)),
                 fontSize = 16.sp,
                 color = Color.White,
@@ -169,18 +169,6 @@ fun InfoSetting() {
                         .padding(start = 10.dp, end = 10.dp)
                         .clickable {
                             uriHandler.openUri("https://www.instagram.com/mustbe_daemon")
-                        }
-
-                )
-                Image(   // Instagram icon with link
-                    alignment = Alignment.Center,
-                    painter = painterResource(id = R.drawable.xtwitter),
-                    contentDescription = "Circular Image",
-                    modifier = Modifier
-                        .size(60.dp)
-                        .padding(start = 10.dp, end = 10.dp)
-                        .clickable {
-                            uriHandler.openUri("https://x.com/daemon_nitesh")
                         }
 
                 )

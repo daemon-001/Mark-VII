@@ -35,7 +35,7 @@
 
 ## Features
 
-### 🤖 Multi-Provider AI Access
+### Multi-Provider AI Access
 - **Anthropic:** Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Haiku
 - **OpenAI:** GPT-4 Turbo, GPT-4, GPT-3.5 Turbo
 - **Meta:** Llama 3.3, Llama 3.1 70B/8B, Llama 4 Maverick/Scout
@@ -45,36 +45,51 @@
 - **Qwen:** Qwen3 Coder, Qwen3 235B, Qwen 2.5 variants
 - **And 40+ more models!**
 
-### 🔥 Firebase Cloud Integration
-- ✅ **Remote Model Management** - Add/remove models without app updates
-- ✅ **Dynamic API Keys** - Update credentials remotely
-- ✅ **Instant Updates** - Changes reflect immediately on app restart
-- ✅ **Secure Storage** - API keys stored in Firebase, not in code
-- ✅ **Automatic Fallback** - Works offline with cached configuration
+### Firebase Cloud Integration
+- **Remote Model Management** - Add/remove models without app updates
+- **Dynamic API Keys** - Update credentials remotely
+- **Instant Updates** - Changes reflect immediately on app restart
+- **Secure Storage** - API keys stored in Firebase, not in code
+- **Automatic Fallback** - Works offline with cached configuration
+- **Exception Model Handling** - Automatically manages models requiring ":free" suffix
+- **404 Auto-Recovery** - Smart error handling with retry suggestions
 
-### 💬 Chat Features
-- 🗨️ **Text Conversations** - Chat with any AI model
-- 🖼️ **Image Understanding** - Upload images and ask questions (vision models)
-- 🔄 **Model Switching** - Switch between models mid-conversation
-- 💾 **Chat History** - Review previous conversations
-- 🏷️ **Brand Display** - See which AI (e.g., "Mark VII x Deepseek") answered
+### Chat Features
+- **Text Conversations** - Chat with any AI model
+- **Image Understanding** - Upload images and ask questions (vision models)
+- **Model Switching** - Switch between models mid-conversation
+- **Chat History** - Review previous conversations
+- **Brand Display** - See which AI (e.g., "Mark VII x Deepseek") answered
+- **Voice Input** - Speak your prompts using voice recognition
+- **Text-to-Speech** - Listen to AI responses
+- **Copy & Share** - Easy text copying and sharing of responses
+- **Retry with Different Models** - Re-run prompts with alternate AI models
 
-### 🎨 User Experience
-- ⚡ **Instant Startup** - Welcome guide loads in <10ms
-- 📱 **Material 3 Design** - Modern, beautiful interface
-- 🌓 **Dynamic Themes** - Light/Dark theme support
-- 🎭 **Smooth Animations** - Lottie-powered animations
-- 📋 **Copy/Paste Support** - Easy text selection and sharing
+### User Experience
+- **Instant Startup** - Welcome guide loads in <10ms
+- **Material 3 Design** - Modern, beautiful interface
+- **Dark Theme** - Eye-friendly dark color scheme with accent highlights
+- **Smooth Animations** - Lottie-powered animations and streaming cursor effects
+- **Text Selection** - Easy copy/paste support for all messages
+- **Syntax Highlighting** - Beautiful code rendering with language-specific colors
+- **Markdown Support** - Rich text formatting with inline code and code blocks
+- **Image Attachment UI** - Clean preview of attached images with pin indicator
+- **Streaming Responses** - Real-time text streaming with animated cursor
+- **Haptic Feedback** - Tactile feedback during streaming responses
+- **Stop Generation** - Red stop button to cancel streaming responses anytime
+- **Smart Model Selection** - Dropdown with model switching mid-conversation
+- **Auto-Scroll** - Automatic scrolling to latest message
+- **No White Flash** - Black background even when keyboard appears
 
-### 🐍 Management Tools
-- 📊 **CSV Import/Export** - Manage models in spreadsheets
-- 🔄 **Bulk Updates** - Update 50+ models at once
-- 🖥️ **Interactive CLI** - Menu-driven Python script
-- ✅ **Validation** - Automatic format checking
+### Management Tools
+- **CSV Import/Export** - Manage models in spreadsheets
+- **Bulk Updates** - Update 50+ models at once
+- **Interactive CLI** - Menu-driven Python script
+- **Validation** - Automatic format checking
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Android Studio Arctic Fox or later
@@ -139,7 +154,7 @@ python update_firebase_models.py --csv models.csv
 
 ---
 
-## 📱 Installation
+## Installation
 
 ### For Users (APK)
 
@@ -161,7 +176,7 @@ See [Quick Start](#quick-start) above.
 
 ---
 
-## 🐍 Python Management Tools
+## Python Management Tools
 
 ### Bulk Model Management with CSV
 
@@ -192,14 +207,14 @@ anthropic/claude-3-5-sonnet-20241022,Claude 3.5 Sonnet,TRUE,3
 ```
 
 **Benefits:**
-- ✅ Edit 50+ models in Excel/Google Sheets
-- ✅ Bulk enable/disable models
-- ✅ Easy reordering
-- ✅ Version control friendly
+- Edit 50+ models in Excel/Google Sheets
+- Bulk enable/disable models
+- Easy reordering
+- Version control friendly
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 ### Setup Guides
 - **CHANGELOG.md** - Complete version history and changes
@@ -215,16 +230,33 @@ anthropic/claude-3-5-sonnet-20241022,Claude 3.5 Sonnet,TRUE,3
 - Check Firestore structure: `app_config/models` document must have `list` field (not `models`)
 - Verify `app_config/api_keys` document has `openrouterApiKey` field
 - Ensure `google-services.json` is in `app/` folder
+- Check `exp_models` collection for exception models
 
-#### HTTP 401 Error
+#### HTTP 401 Error (Unauthorized)
 - Invalid API key
 - Get new key from [OpenRouter](https://openrouter.ai/keys)
 - Update in Firebase: `app_config/api_keys/openrouterApiKey`
 
-#### HTTP 404 Error
-- Invalid model name
+#### HTTP 404 Error (Model Not Found)
+- Model may require ":free" suffix
+- App automatically adds failing models to `exp_models` collection
+- Retry the request after error - it will use the correct format
 - Check model exists on [OpenRouter Models](https://openrouter.ai/models)
-- Update model name in Firestore
+
+#### HTTP 429 Error (Rate Limit)
+- Too many requests
+- Wait a few seconds and retry
+- Consider upgrading OpenRouter plan
+
+#### HTTP 502/503 Error (Server Issues)
+- OpenRouter or model provider temporarily down
+- Try a different model
+- Wait and retry later
+
+#### App Crashing
+- Clear app data: Settings → Apps → Mark VII → Clear Data
+- Reinstall the app
+- Check for updates
 
 #### Build Errors
 ```bash
@@ -235,16 +267,19 @@ anthropic/claude-3-5-sonnet-20241022,Claude 3.5 Sonnet,TRUE,3
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ### Tech Stack
 - **Language:** Kotlin
 - **UI Framework:** Jetpack Compose + Material 3
 - **Architecture:** MVVM (Model-View-ViewModel)
 - **Backend:** Firebase Firestore
-- **API Client:** Retrofit + OkHttp
+- **API Client:** Retrofit + OkHttp (with SSE streaming support)
 - **AI Provider:** OpenRouter (unified API)
 - **Async:** Kotlin Coroutines + StateFlow
+- **Animations:** Lottie, Compose Animations
+- **Text Rendering:** Markdown with syntax highlighting
+- **Voice:** Android Speech Recognition & Text-to-Speech
 
 ### Project Structure
 ```
@@ -273,14 +308,15 @@ Mark-VII/
 
 ---
 
-## 🎯 Usage Examples
+## Usage Examples
 
 ### Basic Chat
 1. Open Mark VII
 2. Select a model from dropdown (e.g., "Deepseek Chat V3.1")
 3. Type your message
-4. Tap send (✈️)
-5. Get instant AI response with "Mark VII x Deepseek" header
+4. Tap send (▲) or press the microphone to speak
+5. Get instant streaming AI response with "Mark VII x Deepseek" header
+6. Tap the red stop button (■) to cancel streaming anytime
 
 ### Image Understanding
 1. Tap camera icon (📷)
@@ -290,15 +326,17 @@ Mark-VII/
 
 ### Comparing Models
 1. Ask Claude 3.5 Sonnet a question
-2. See response with "Mark VII x Anthropic"
-3. Switch to GPT-4 Turbo
-4. Ask the same question
-5. See response with "Mark VII x Openai"
-6. Compare the different approaches!
+2. See streaming response with animated cursor
+3. See response with "Mark VII x Anthropic" brand header
+4. Switch to GPT-4 Turbo
+5. Ask the same question
+6. See response with "Mark VII x Openai"
+7. Compare the different approaches!
+8. Use retry button to re-run prompts with different models
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Here's how:
 
@@ -328,7 +366,7 @@ We welcome contributions! Here's how:
 
 ---
 
-## 📊 Performance Metrics
+## Performance Metrics
 
 ### Version 2.0 vs 1.x
 
@@ -339,11 +377,15 @@ We welcome contributions! Here's how:
 | **API Cost/Launch** | $0.001 | $0.00 | **100% savings** |
 | **Configuration** | Hardcoded | Cloud-based | **Instant updates** |
 | **Dependency** | Only Gemini  | Multiple Companies | **More reliable** |
+| **Streaming** | No | Yes (SSE) | **Real-time responses** |
+| **Error Handling** | Basic | Comprehensive (400-503) | **Better UX** |
+| **UI Performance** | Good | Optimized (memoization) | **Smoother** |
+| **Stop Generation** | No | Yes (cancel anytime) | **User control** |
 
 
 ---
 
-## 📦 Dependencies
+## Dependencies
 
 ### Core
 ```gradle
@@ -369,18 +411,18 @@ pip install firebase-admin
 
 ---
 
-## 🔒 Security & Privacy
+## Security & Privacy
 
 ### Data Protection
-- ✅ API keys stored in Firebase (not in code)
-- ✅ `google-services.json` excluded from Git
-- ✅ HTTPS encryption for all API calls
-- ✅ No user data stored without consent
+- API keys stored in Firebase (not in code)
+- `google-services.json` excluded from Git
+- HTTPS encryption for all API calls
+- No user data stored without consent
 
 
 ---
 
-## 🌍 Supported Models
+## Supported Models
 
 ### Current (50 models)
 See `update_models/models.csv` for complete list including:
@@ -389,7 +431,17 @@ See `update_models/models.csv` for complete list including:
 - Meta (Llama 3.3, 3.1, 4 variants)
 - Qwen (Qwen3, Qwen 2.5 variants)
 - Mistral (Large, Small, Medium variants)
+- xAI (Grok variants)
+- Anthropic (Claude 3.5, 3 variants)
+- OpenAI (GPT-4, GPT-3.5 variants)
 - And 30+ more providers!
+
+### Exception Models (":free" suffix)
+Some models require the ":free" suffix to work. The app automatically:
+- Detects 404 errors for models without ":free"
+- Adds the model to Firebase `exp_models` collection
+- Retries with correct format
+- Shows user-friendly error dialog with retry option
 
 ### Add More
 Simply edit CSV and run:
@@ -399,7 +451,7 @@ python update_firebase_models.py --csv models.csv
 
 ---
 
-## 📱 Screenshots
+## Screenshots
 
 ### Main Chat Interface
 ![Mark VII Chat](https://github.com/user-attachments/assets/5ef5e209-fb29-47e3-b8b1-0bd9999a3ea9)
@@ -407,7 +459,7 @@ python update_firebase_models.py --csv models.csv
 
 ---
 
-## 📥 Download
+## Download
 
 ### Latest Release
 - **Stable:** [GitHub Releases](https://github.com/daemon-001/Mark-VII/releases)
@@ -419,18 +471,18 @@ python update_firebase_models.py --csv models.csv
 - **Target Android:** 14 (API 34)
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the **MIT License** - see [LICENSE](LICENSE) file for details.
 
 ---
 
-## 📞 Support
+## Support
 
 ### Get Help
-- 📧 Email: nitesh.kumar4work@gmail.com
-- 💬 GitHub Issues: [Report Bug](https://github.com/daemon-001/Mark-VII/issues/new)
-- 💡 Feature Request: [Request Feature](https://github.com/daemon-001/Mark-VII/issues/new)
+- Email: nitesh.kumar4work@gmail.com
+- GitHub Issues: [Report Bug](https://github.com/daemon-001/Mark-VII/issues/new)
+- Feature Request: [Request Feature](https://github.com/daemon-001/Mark-VII/issues/new)
 
 ### Developer
 - **Author:** Nitesh (@daemon-001)
@@ -440,22 +492,22 @@ This project is licensed under the **MIT License** - see [LICENSE](LICENSE) file
 
 ---
 
-## ⭐ Show Your Support
+## Show Your Support
 
 If you find Mark VII helpful, please:
-- ⭐ Star this repository
-- 🐛 Report bugs
-- 💡 Suggest features
-- 🤝 Contribute code
-- 📢 Share with others
+- Star this repository
+- Report bugs
+- Suggest features
+- Contribute code
+- Share with others
 
 ---
 
 <div align="center">
 
-**Made with ❤️ by Nitesh**
+**Made by Nitesh**
 
-[🏠 Home](https://github.com/daemon-001/Mark-VII) • [📥 Download](https://github.com/daemon-001/Mark-VII/releases) • [🐛 Report Bug](https://github.com/daemon-001/Mark-VII/issues) • [💡 Request Feature](https://github.com/daemon-001/Mark-VII/issues)
+[Home](https://github.com/daemon-001/Mark-VII) • [Download](https://github.com/daemon-001/Mark-VII/releases) • [Report Bug](https://github.com/daemon-001/Mark-VII/issues) • [Request Feature](https://github.com/daemon-001/Mark-VII/issues)
 
 *Enjoy your advanced multi-provider AI chatbot experience!*
 

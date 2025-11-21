@@ -12,12 +12,19 @@ import android.net.Uri
 import android.os.Bundle
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -49,10 +56,12 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Stop
@@ -162,6 +171,9 @@ class MainActivity : ComponentActivity() {
 //        Thread.sleep(1000) // splash screen delay
         installSplashScreen()  // splash screen ui
         
+        // Initialize ChatHistoryManager
+        com.daemon.markvii.data.ChatHistoryManager.init(applicationContext)
+        
         // Initialize TextToSpeech
         textToSpeech = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
@@ -190,6 +202,10 @@ class MainActivity : ComponentActivity() {
                     NavHost(navController = navController, startDestination = "home", builder = {
                         composable("home",){
                             opentimes++
+                            
+                            // ViewModel needs to be at this scope to be accessible by both topBar and content
+                            val chaViewModel = viewModel<ChatViewModel>()
+                            
                             Scaffold(
 //                                top bar items
                                 topBar = {
@@ -208,35 +224,74 @@ class MainActivity : ComponentActivity() {
                                         color = MaterialTheme.colorScheme.onPrimary,
                                         modifier = Modifier.align(Alignment.CenterStart)
                                     )
+                                    
+                                    // Clear chat history button
+                                    var showClearDialog by remember { mutableStateOf(false) }
+                                    
+                                    Row(
+                                        modifier = Modifier.align(Alignment.CenterEnd),
+                                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // Clear chat icon
+                                        Icon(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clickable {
+                                                    showClearDialog = true
+                                                },
+                                            imageVector = Icons.Rounded.Delete,
+                                            contentDescription = "Clear Chat History",
+                                            tint = MaterialTheme.colorScheme.onPrimary
+                                        )
 
-//                                      info tab start icon at top bar
-                                    val composition by rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.info_card))
-                                    LottieAnimation(
-                                        composition = composition,
-                                        modifier = Modifier
-                                            .size(60.dp)
-                                            .align(Alignment.CenterEnd)
-                                            .clickable {
-                                                navController.navigate("info_screen")
+                                        // Info tab icon
+                                        val composition by rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.info_card))
+                                        LottieAnimation(
+                                            composition = composition,
+                                            modifier = Modifier
+                                                .size(60.dp)
+                                                .clickable {
+                                                    navController.navigate("info_screen")
+                                                },
+                                            iterations = LottieConstants.IterateForever  // Play in loop
+                                        )
+                                    }
+                                    
+                                    // Clear chat confirmation dialog
+                                    if (showClearDialog) {
+                                        AlertDialog(
+                                            onDismissRequest = { showClearDialog = false },
+                                            title = { Text("Clear Chat History?") },
+                                            text = { Text("This will permanently delete all chat messages. This action cannot be undone.") },
+                                            confirmButton = {
+                                                TextButton(
+                                                    onClick = {
+                                                        chaViewModel.clearChatHistory()
+                                                        showClearDialog = false
+                                                    },
+                                                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                                                        contentColor = Color(0xFFFF3B30)
+                                                    )
+                                                ) {
+                                                    Text("Clear")
+                                                }
                                             },
-                                        iterations = LottieConstants.IterateForever  // Play in loop
-                                    )
-//                                        Icon(
-//                                            modifier = Modifier
-//                                                .size(35.dp)
-//                                                .align(Alignment.CenterEnd)
-//                                                .clickable {
-//                                                    navController.navigate("info_screen")
-////                                                    Toast.makeText(context, "Under development...", Toast.LENGTH_SHORT).show()
-//                                                },
-//                                            imageVector = Icons.Rounded.Info,
-//                                            contentDescription = "Info Tab",
-//                                            tint = MaterialTheme.colorScheme.onPrimary
-//                                        )
+                                            dismissButton = {
+                                                TextButton(
+                                                    onClick = { showClearDialog = false }
+                                                ) {
+                                                    Text("Cancel")
+                                                }
+                                            },
+                                            containerColor = Color(0xFF1C1C1E),
+                                            titleContentColor = Color.White,
+                                            textContentColor = Color(0xFFE5E5E5)
+                                        )
+                                    }
                                 }
 
 //                                    Show welcome guide once when app opens (no API call)
-                                val chaViewModel = viewModel<ChatViewModel>()
                                 if(opentimes==1){
                                     chaViewModel.showWelcomeGuide()
                                 }
@@ -391,59 +446,56 @@ class MainActivity : ComponentActivity() {
         val context = LocalContext.current
         val hapticFeedback = androidx.compose.ui.platform.LocalHapticFeedback.current
         
-        // Track last haptic trigger position for consistent feedback
-        val lastHapticPosition = remember { mutableStateOf(0) }
-        val hasTriggeredStartHaptic = remember { mutableStateOf(false) }
-        val currentChat = chatState.chatList.firstOrNull()
+        // Track haptic feedback based on chunk arrivals
+        val lastHapticTrigger = remember { mutableStateOf(0L) }
+        val hapticTrigger = chatState.hapticTrigger
         
-        // Haptic feedback during streaming - triggered by snapshot reads in composition
-        if (currentChat != null && currentChat.isStreaming && !currentChat.isFromUser) {
-            val currentLength = currentChat.prompt.length
-            
-            // Immediate haptic on streaming start
-            if (!hasTriggeredStartHaptic.value && currentLength > 0) {
-                androidx.compose.runtime.SideEffect {
-                    hapticFeedback.performHapticFeedback(
-                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove
-                    )
-                    hasTriggeredStartHaptic.value = true
-                    lastHapticPosition.value = currentLength
-                }
-            }
-            // Then trigger at regular character intervals (every 10 chars)
-            else if (currentLength >= lastHapticPosition.value + 10) {
-                androidx.compose.runtime.SideEffect {
-                    hapticFeedback.performHapticFeedback(
-                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove
-                    )
-                    lastHapticPosition.value = currentLength
-                }
-            }
-        } else if (currentChat?.isStreaming == false) {
-            // Reset when streaming ends
-            androidx.compose.runtime.SideEffect {
-                lastHapticPosition.value = 0
-                hasTriggeredStartHaptic.value = false
+        // Trigger haptic when new chunk arrives
+        LaunchedEffect(hapticTrigger) {
+            if (hapticTrigger > 0L && hapticTrigger != lastHapticTrigger.value) {
+                hapticFeedback.performHapticFeedback(
+                    androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove
+                )
+                lastHapticTrigger.value = hapticTrigger
             }
         }
         
-        // State for loading free models from OpenRouter
+        // State for loading free models from OpenRouter and Gemini
         var isLoadingModels by remember { mutableStateOf(false) }
         var freeModels by remember { mutableStateOf<List<ModelInfo>>(emptyList()) }
         var modelsLoadError by remember { mutableStateOf<String?>(null) }
         
-        // Observe Firebase API key
+        // Observe Firebase API keys and Gemini models
         val firebaseApiKey by FirebaseConfigManager.apiKey.collectAsState()
+        val geminiApiKey by FirebaseConfigManager.geminiApiKey.collectAsState()
+        val firebaseGeminiModels by FirebaseConfigManager.geminiModels.collectAsState()
         
-        // Initialize Firebase to get API key and exception models
+        // Convert Firebase Gemini models to ModelInfo
+        val geminiModels = remember(firebaseGeminiModels) {
+            firebaseGeminiModels.map { firebaseModel ->
+                ModelInfo(
+                    displayName = firebaseModel.displayName,
+                    apiModel = firebaseModel.apiModel,
+                    isAvailable = firebaseModel.isAvailable
+                )
+            }
+        }
+        
+        // Initialize Firebase to get API keys and exception models
         LaunchedEffect(Unit) {
             FirebaseConfigManager.initialize()
         }
         
-        // Update API key when Firebase data changes
+        // Update API keys when Firebase data changes
         LaunchedEffect(firebaseApiKey) {
             if (firebaseApiKey.isNotEmpty()) {
                 ChatData.updateApiKey(firebaseApiKey)
+            }
+        }
+        
+        LaunchedEffect(geminiApiKey) {
+            if (geminiApiKey.isNotEmpty()) {
+                com.daemon.markvii.data.GeminiClient.updateApiKey(geminiApiKey)
             }
         }
         
@@ -500,7 +552,8 @@ class MainActivity : ComponentActivity() {
         // Observe error state from ViewModel
         val currentError = chatState.error
 
-        // Show error dialog when error state is present
+        // Error dialog removed - errors now displayed as red text in chat
+        /*
         currentError?.let { errorInfo ->
             ErrorDialog(
                 errorTitle = errorInfo.title,
@@ -524,6 +577,7 @@ class MainActivity : ComponentActivity() {
                 } else null
             )
         }
+        */
         
         // Model selector state for prompt box
         val isPromptDropDownExpanded = remember { mutableStateOf(false) }
@@ -533,7 +587,22 @@ class MainActivity : ComponentActivity() {
         val listState = rememberLazyListState()
         val coroutineScope = rememberCoroutineScope()
         
-        val currentModels = freeModels
+        // Get current API provider from state
+        val currentApiProvider = chatState.currentApiProvider
+        
+        // Switch models based on API provider
+        val currentModels = when (currentApiProvider) {
+            ApiProvider.OPENROUTER -> freeModels
+            ApiProvider.GEMINI -> geminiModels
+        }
+        
+        // Reset model selection when API provider changes
+        LaunchedEffect(currentApiProvider) {
+            promptItemPosition.value = 0
+            if (currentModels.isNotEmpty()) {
+                ChatData.selected_model = currentModels[0].apiModel
+            }
+        }
         
         // Set initial model when models load (only once)
         var hasSetInitialModel by remember { mutableStateOf(false) }
@@ -552,9 +621,17 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Auto-scroll to bottom when new message appears
-        LaunchedEffect(chatState.chatList.size) {
+        // Auto-scroll to bottom when new message appears or when generating
+        LaunchedEffect(chatState.chatList.size, chatState.isGeneratingResponse) {
             if (chatState.chatList.isNotEmpty()) {
+                listState.animateScrollToItem(0)
+            }
+        }
+        
+        // Auto-scroll during streaming when content changes
+        val currentChat = chatState.chatList.firstOrNull()
+        LaunchedEffect(currentChat?.prompt) {
+            if (currentChat != null && currentChat.isStreaming && !currentChat.isFromUser) {
                 listState.animateScrollToItem(0)
             }
         }
@@ -570,6 +647,22 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier
                     .fillMaxSize()
             ) {
+                // Show centered prompt suggestions when chat is empty
+                if (chatState.showPromptSuggestions && chatState.chatList.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = 140.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        PromptSuggestionBubbles(
+                            onSuggestionClick = { suggestion ->
+                                chaViewModel.onEvent(ChatUiEvent.UpdatePrompt(suggestion))
+                            }
+                        )
+                    }
+                }
+                
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
@@ -582,30 +675,53 @@ class MainActivity : ComponentActivity() {
                         items = chatState.chatList,
                         key = { _, chat -> chat.id }
                     ) { index, chat ->
-                        if (chat.isFromUser) {
-                            UserChatItem(
-                                prompt = chat.prompt, bitmap = chat.bitmap
+                        // Animate chat items with fade + slide
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = true,
+                            enter = androidx.compose.animation.fadeIn(
+                                animationSpec = androidx.compose.animation.core.tween(300)
+                            ) + androidx.compose.animation.slideInVertically(
+                                initialOffsetY = { it / 4 },
+                                animationSpec = androidx.compose.animation.core.tween(
+                                    durationMillis = 300,
+                                    easing = androidx.compose.animation.core.FastOutSlowInEasing
+                                )
                             )
-                        } else {
-                            // Get the previous user message for retry
-                            val previousUserChat = if (index < chatState.chatList.size - 1) {
-                                chatState.chatList.getOrNull(index + 1)
-                            } else null
-                            
-                            ModelChatItem(
-                                response = chat.prompt,
-                                modelUsed = chat.modelUsed,
-                                isStreaming = chat.isStreaming,
-                                freeModels = freeModels,
-                                onRetry = { _ ->
-                                    chaViewModel.onEvent(
-                                        ChatUiEvent.RetryPrompt(
-                                            previousUserChat?.prompt ?: "",
-                                            previousUserChat?.bitmap
+                        ) {
+                            if (chat.isFromUser) {
+                                UserChatItem(
+                                    prompt = chat.prompt, bitmap = chat.bitmap
+                                )
+                            } else {
+                                // Get the previous user message for retry
+                                val previousUserChat = if (index < chatState.chatList.size - 1) {
+                                    chatState.chatList.getOrNull(index + 1)
+                                } else null
+                                
+                                ModelChatItem(
+                                    response = chat.prompt,
+                                    modelUsed = chat.modelUsed,
+                                    isStreaming = chat.isStreaming,
+                                    isError = chat.isError,
+                                    freeModels = freeModels,
+                                    geminiModels = geminiModels,
+                                    currentApiProvider = currentApiProvider,
+                                    hasImage = previousUserChat?.bitmap != null,
+                                    onRetry = { _ ->
+                                        chaViewModel.onEvent(
+                                            ChatUiEvent.RetryPrompt(
+                                                previousUserChat?.prompt ?: "",
+                                                previousUserChat?.bitmap
+                                            )
                                         )
-                                    )
-                                }
-                            )
+                                    },
+                                    onApiSwitch = { provider ->
+                                        chaViewModel.onEvent(
+                                            ChatUiEvent.SwitchApiProvider(provider)
+                                        )
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -829,11 +945,101 @@ class MainActivity : ComponentActivity() {
                                             onDismissRequest = { isPromptDropDownExpanded.value = false },
                                             modifier = Modifier
                                                 .width(280.dp)
-                                                .heightIn(max = 400.dp)
+                                                .heightIn(max = 450.dp)
                                                 .background(Color(0xFF2C2C2E)),
                                             shape = RoundedCornerShape(20.dp),
                                             containerColor = Color(0xFF2C2C2E)
                                         ) {
+                                            // API Provider Switch at the top
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    // Gemini button (now on the left)
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .clip(RoundedCornerShape(10.dp))
+                                                            .background(
+                                                                if (currentApiProvider == ApiProvider.GEMINI)
+                                                                    Color(0xFF00D9FF).copy(alpha = 0.2f)
+                                                                else
+                                                                    Color(0xFF3A3A3C)
+                                                            )
+                                                            .clickable {
+                                                                chaViewModel.onEvent(
+                                                                    ChatUiEvent.SwitchApiProvider(ApiProvider.GEMINI)
+                                                                )
+                                                            }
+                                                            .padding(vertical = 8.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = "Gemini",
+                                                            color = if (currentApiProvider == ApiProvider.GEMINI)
+                                                                Color(0xFF00D9FF)
+                                                            else
+                                                                Color(0xFF8E8E93),
+                                                            fontSize = 13.sp,
+                                                            fontWeight = if (currentApiProvider == ApiProvider.GEMINI)
+                                                                FontWeight.SemiBold
+                                                            else
+                                                                FontWeight.Normal
+                                                        )
+                                                    }
+                                                    
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    
+                                                    // OpenRouter button (now on the right)
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .clip(RoundedCornerShape(10.dp))
+                                                            .background(
+                                                                if (currentApiProvider == ApiProvider.OPENROUTER)
+                                                                    Color(0xFF00D9FF).copy(alpha = 0.2f)
+                                                                else
+                                                                    Color(0xFF3A3A3C)
+                                                            )
+                                                            .clickable {
+                                                                chaViewModel.onEvent(
+                                                                    ChatUiEvent.SwitchApiProvider(ApiProvider.OPENROUTER)
+                                                                )
+                                                            }
+                                                            .padding(vertical = 8.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = "OpenRouter",
+                                                            color = if (currentApiProvider == ApiProvider.OPENROUTER)
+                                                                Color(0xFF00D9FF)
+                                                            else
+                                                                Color(0xFF8E8E93),
+                                                            fontSize = 13.sp,
+                                                            fontWeight = if (currentApiProvider == ApiProvider.OPENROUTER)
+                                                                FontWeight.SemiBold
+                                                            else
+                                                                FontWeight.Normal
+                                                        )
+                                                    }
+                                                }
+                                                
+                                                // Divider
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(vertical = 8.dp)
+                                                        .height(1.dp)
+                                                        .background(Color(0xFF3A3A3C))
+                                                )
+                                            }
+                                            
                                         if (currentModels.isEmpty()) {
                                             Box(
                                                 modifier = Modifier
@@ -933,6 +1139,27 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                                 
+                                // Image picker icon - only visible when Gemini is selected (LEFT of mic)
+                                if (currentApiProvider == ApiProvider.GEMINI) {
+                                    IconButton(
+                                        onClick = {
+                                            imagePicker.launch(
+                                                PickVisualMediaRequest(
+                                                    ActivityResultContracts.PickVisualMedia.ImageOnly
+                                                )
+                                            )
+                                        },
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Add,
+                                            contentDescription = "Add image",
+                                            tint = Color(0xFFE5E5E5),
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+                                }
+                                
                                 // Microphone icon (moved to right)
                                 IconButton(
                                     onClick = {
@@ -965,6 +1192,7 @@ class MainActivity : ComponentActivity() {
                                 }
                                 
                                 // Send/Stop button
+                                val interactionSource = remember { MutableInteractionSource() }
                                 Box(
                                     modifier = Modifier
                                         .size(36.dp)
@@ -979,7 +1207,9 @@ class MainActivity : ComponentActivity() {
                                             }
                                         )
                                         .clickable(
-                                            enabled = chatState.isGeneratingResponse || chatState.prompt.isNotEmpty() || bitmap != null
+                                            enabled = chatState.isGeneratingResponse || chatState.prompt.isNotEmpty() || bitmap != null,
+                                            interactionSource = interactionSource,
+                                            indication = null // Remove ripple effect for instant response
                                         ) {
                                             if (chatState.isGeneratingResponse) {
                                                 // Stop streaming
@@ -1250,20 +1480,16 @@ class MainActivity : ComponentActivity() {
         modelUsed: String = "",
         onRetry: (String) -> Unit = {},
         isStreaming: Boolean = false,
-        freeModels: List<ModelInfo> = emptyList()
+        freeModels: List<ModelInfo> = emptyList(),
+        geminiModels: List<ModelInfo> = emptyList(),
+        currentApiProvider: ApiProvider = ApiProvider.GEMINI,
+        hasImage: Boolean = false,
+        isError: Boolean = false,
+        onApiSwitch: (ApiProvider) -> Unit = {}
     ) {
         val context = LocalContext.current
         var showModelSelector by remember { mutableStateOf(false) }
-        
-        // Haptic feedback for streaming
-        val hapticFeedback = androidx.compose.ui.platform.LocalHapticFeedback.current
-        
-        // Trigger haptic when streaming starts
-        LaunchedEffect(isStreaming) {
-            if (isStreaming) {
-                hapticFeedback.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-            }
-        }
+        var selectedApiProvider by remember { mutableStateOf(currentApiProvider) }
         
         // Extract brand name from model (memoized)
         val brandName = remember(modelUsed) {
@@ -1370,8 +1596,24 @@ class MainActivity : ComponentActivity() {
                     
                     Spacer(modifier = Modifier.height(8.dp))
                     
-                    // Render markdown with code block enhancements
-                    MarkdownWithCodeCopy(response = response, context = context)
+                    // Render markdown with code block enhancements or error text with fade-in animation
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = response.isNotEmpty(),
+                        enter = androidx.compose.animation.fadeIn(
+                            animationSpec = androidx.compose.animation.core.tween(200)
+                        )
+                    ) {
+                        if (isError) {
+                            Text(
+                                text = response,
+                                fontSize = 16.sp,
+                                color = Color(0xFFFF3B30), // Red color for errors
+                                fontFamily = FontFamily.Monospace
+                            )
+                        } else {
+                            MarkdownWithCodeCopy(response = response, context = context)
+                        }
+                    }
                 }
             }
             
@@ -1505,61 +1747,193 @@ class MainActivity : ComponentActivity() {
                         )
                     },
                     text = {
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 400.dp)
+                        Column(
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            if (freeModels.isEmpty()) {
-                                item {
+                            // API Provider Switch
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Gemini button
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(
+                                            if (selectedApiProvider == ApiProvider.GEMINI)
+                                                Color(0xFF00D9FF).copy(alpha = 0.2f)
+                                            else
+                                                Color(0xFF3A3A3C)
+                                        )
+                                        .clickable {
+                                            selectedApiProvider = ApiProvider.GEMINI
+                                            onApiSwitch(ApiProvider.GEMINI)
+                                        }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
                                     Text(
-                                        text = "Loading models...",
-                                        color = Color(0xFF8E8E93),
-                                        modifier = Modifier.padding(16.dp)
+                                        text = "Gemini",
+                                        color = if (selectedApiProvider == ApiProvider.GEMINI)
+                                            Color(0xFF00D9FF)
+                                        else
+                                            Color(0xFF8E8E93),
+                                        fontSize = 13.sp,
+                                        fontWeight = if (selectedApiProvider == ApiProvider.GEMINI)
+                                            FontWeight.SemiBold
+                                        else
+                                            FontWeight.Normal
                                     )
                                 }
-                            } else {
-                                itemsIndexed(freeModels) { _, model ->
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 4.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(
-                                                if (model.apiModel == modelUsed)
-                                                    Color(0xFF00D9FF).copy(alpha = 0.1f)
-                                                else
-                                                    Color.Transparent
-                                            )
-                                            .clickable {
-                                                ChatData.selected_model = model.apiModel
-                                                showModelSelector = false
-                                                onRetry(model.apiModel)
+                                
+                                Spacer(modifier = Modifier.width(8.dp))
+                                
+                                // OpenRouter button
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(
+                                            if (selectedApiProvider == ApiProvider.OPENROUTER)
+                                                Color(0xFF00D9FF).copy(alpha = 0.2f)
+                                            else
+                                                Color(0xFF3A3A3C)
+                                        )
+                                        .clickable {
+                                            if (hasImage) {
+                                                Toast.makeText(
+                                                    context,
+                                                    "⚠️ OpenRouter doesn't support images. Please use Gemini for image queries.",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            } else {
+                                                selectedApiProvider = ApiProvider.OPENROUTER
+                                                onApiSwitch(ApiProvider.OPENROUTER)
                                             }
-                                            .padding(12.dp)
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically
+                                        }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "OpenRouter",
+                                        color = if (selectedApiProvider == ApiProvider.OPENROUTER)
+                                            Color(0xFF00D9FF)
+                                        else
+                                            Color(0xFF8E8E93),
+                                        fontSize = 13.sp,
+                                        fontWeight = if (selectedApiProvider == ApiProvider.OPENROUTER)
+                                            FontWeight.SemiBold
+                                        else
+                                            FontWeight.Normal
+                                    )
+                                }
+                            }
+                            
+                            // Show warning if image exists and OpenRouter selected
+                            if (hasImage && selectedApiProvider == ApiProvider.OPENROUTER) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 8.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFFFF3B30).copy(alpha = 0.1f))
+                                        .padding(12.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = "⚠️",
+                                            fontSize = 16.sp,
+                                            modifier = Modifier.padding(end = 8.dp)
+                                        )
+                                        Text(
+                                            text = "Images are not supported with OpenRouter",
+                                            color = Color(0xFFFF3B30),
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                }
+                            }
+                            
+                            // Divider
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp)
+                                    .height(1.dp)
+                                    .background(Color(0xFF3A3A3C))
+                            )
+                            
+                            // Model List
+                            val currentModels = if (selectedApiProvider == ApiProvider.GEMINI) geminiModels else freeModels
+                            
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 400.dp)
+                            ) {
+                                if (currentModels.isEmpty()) {
+                                    item {
+                                        Text(
+                                            text = "Loading models...",
+                                            color = Color(0xFF8E8E93),
+                                            modifier = Modifier.padding(16.dp)
+                                        )
+                                    }
+                                } else {
+                                    itemsIndexed(currentModels) { _, model ->
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(
+                                                    if (model.apiModel == modelUsed)
+                                                        Color(0xFF00D9FF).copy(alpha = 0.1f)
+                                                    else
+                                                        Color.Transparent
+                                                )
+                                                .clickable {
+                                                    if (hasImage && selectedApiProvider == ApiProvider.OPENROUTER) {
+                                                        Toast.makeText(
+                                                            context,
+                                                            "⚠️ Cannot use OpenRouter with images. Switch to Gemini.",
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    } else {
+                                                        ChatData.selected_model = model.apiModel
+                                                        showModelSelector = false
+                                                        onRetry(model.apiModel)
+                                                    }
+                                                }
+                                                .padding(12.dp)
                                         ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(6.dp)
-                                                    .clip(CircleShape)
-                                                    .background(Color(0xFF00D9FF))
-                                            )
-                                            Spacer(modifier = Modifier.width(12.dp))
-                                            Text(
-                                                text = model.displayName,
-                                                color = if (model.apiModel == modelUsed)
-                                                    Color(0xFF00D9FF)
-                                                else
-                                                    Color(0xFFE5E5E5),
-                                                fontSize = 15.sp,
-                                                fontWeight = if (model.apiModel == modelUsed)
-                                                    FontWeight.SemiBold
-                                                else
-                                                    FontWeight.Normal
-                                            )
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(6.dp)
+                                                        .clip(CircleShape)
+                                                        .background(Color(0xFF00D9FF))
+                                                )
+                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Text(
+                                                    text = model.displayName,
+                                                    color = if (model.apiModel == modelUsed)
+                                                        Color(0xFF00D9FF)
+                                                    else
+                                                        Color(0xFFE5E5E5),
+                                                    fontSize = 15.sp,
+                                                    fontWeight = if (model.apiModel == modelUsed)
+                                                        FontWeight.SemiBold
+                                                    else
+                                                        FontWeight.Normal
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -1597,6 +1971,181 @@ class MainActivity : ComponentActivity() {
         }
 
         return null
+    }
+    
+    @Composable
+    fun PromptSuggestionBubbles(onSuggestionClick: (String) -> Unit) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 28.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
+            // Title
+            Text(
+                text = "Getting Started",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                modifier = Modifier.padding(bottom = 20.dp)
+            )
+            
+            // Instructions
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                InstructionStep(
+                    number = "1",
+                    text = "Select your desired AI model"
+                )
+                
+                InstructionStep(
+                    number = "2",
+                    text = "Type your message in the text box below"
+                )
+                
+                InstructionStep(
+                    number = "3",
+                    text = "Tap the send button to get Model responses"
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(28.dp))
+            
+            // Response Actions section
+            Text(
+                text = "Response Actions",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+            
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ActionItem(
+                    icon = "📋",
+                    text = "Copy the response text to clipboard"
+                )
+                ActionItem(
+                    icon = "🔊",
+                    text = "Listen to the response with text-to-speech"
+                )
+                ActionItem(
+                    icon = "🔄",
+                    text = "Regenerate the response using a different model"
+                )
+                ActionItem(
+                    icon = "📤",
+                    text = "Share the response with other apps"
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            // Tips section
+            Text(
+                text = "💡 Tips",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF4A90E2),
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+            
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                TipItem("All models are completely free to use")
+                TipItem("Different models excel at different tasks")
+                TipItem("You can switch models anytime during conversation")
+            }
+        }
+    }
+    
+    @Composable
+    fun InstructionStep(
+        number: String,
+        text: String
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            // Step number circle
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF4A90E2)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = number,
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            
+            Text(
+                text = text,
+                color = Color(0xFFE5E5E5),
+                fontSize = 15.sp,
+                lineHeight = 22.sp,
+                modifier = Modifier.padding(top = 3.dp)
+            )
+        }
+    }
+    
+    @Composable
+    fun ActionItem(
+        icon: String,
+        text: String
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Text(
+                text = icon,
+                fontSize = 18.sp
+            )
+            
+            Text(
+                text = text,
+                color = Color(0xFFE5E5E5),
+                fontSize = 14.sp,
+                lineHeight = 20.sp
+            )
+        }
+    }
+    
+    @Composable
+    fun TipItem(text: String) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Text(
+                text = "•",
+                color = Color(0xFF8E8E93),
+                fontSize = 14.sp
+            )
+            
+            Text(
+                text = text,
+                color = Color(0xFF8E8E93),
+                fontSize = 14.sp,
+                lineHeight = 20.sp
+            )
+        }
     }
 
 
