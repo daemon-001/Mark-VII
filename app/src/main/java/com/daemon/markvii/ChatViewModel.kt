@@ -8,6 +8,7 @@ import com.daemon.markvii.data.ChatData
 import com.daemon.markvii.data.ChatHistoryManager
 import com.daemon.markvii.data.ErrorInfo
 import com.daemon.markvii.data.GeminiClient
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -131,9 +132,12 @@ class ChatViewModel : ViewModel() {
     
     /**
      * Save chat history to persistent storage
+     * Runs asynchronously on IO dispatcher to prevent UI blocking
      */
     private fun saveChatHistory() {
-        ChatHistoryManager.saveChatHistory(_chatState.value.chatList)
+        viewModelScope.launch(Dispatchers.IO) {
+            ChatHistoryManager.saveChatHistory(_chatState.value.chatList)
+        }
     }
     
     /**
@@ -268,8 +272,8 @@ class ChatViewModel : ViewModel() {
                                     )
                                 }
                                 state.copy(
-                                    chatList = updatedList,
-                                    hapticTrigger = System.currentTimeMillis() // Trigger haptic on chunk
+                                    chatList = updatedList
+                                    // Haptics will be handled by typewriter animation in UI
                                 )
                             }
                         }

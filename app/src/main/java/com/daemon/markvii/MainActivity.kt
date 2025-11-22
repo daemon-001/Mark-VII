@@ -100,6 +100,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -131,8 +132,15 @@ import com.daemon.markvii.ui.theme.MarkVIITheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import dev.jeziellago.compose.markdowntext.MarkdownText
-
-
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.rememberUpdatedState
+import org.commonmark.parser.Parser
+import org.commonmark.renderer.html.HtmlRenderer
+import com.daemon.markvii.utils.PdfGenerator
+import androidx.compose.material.icons.rounded.PictureAsPdf
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Share
 
 
 class MainActivity : ComponentActivity() {
@@ -628,13 +636,15 @@ class MainActivity : ComponentActivity() {
             }
         }
         
-        // Auto-scroll during streaming when content changes
-        val currentChat = chatState.chatList.firstOrNull()
-        LaunchedEffect(currentChat?.prompt) {
-            if (currentChat != null && currentChat.isStreaming && !currentChat.isFromUser) {
-                listState.animateScrollToItem(0)
-            }
-        }
+        
+        // Auto-scroll during streaming when content changes - REMOVED to prevent flickering
+        // The reverseLayout = true configuration handles upward expansion naturally
+        // val currentChat = chatState.chatList.firstOrNull()
+        // LaunchedEffect(currentChat?.prompt) {
+        //     if (currentChat != null && currentChat.isStreaming && !currentChat.isFromUser) {
+        //         listState.animateScrollToItem(0)
+        //     }
+        // }
 
 
         Box(
@@ -700,6 +710,7 @@ class MainActivity : ComponentActivity() {
                                 
                                 ModelChatItem(
                                     response = chat.prompt,
+                                    userPrompt = previousUserChat?.prompt ?: "",
                                     modelUsed = chat.modelUsed,
                                     isStreaming = chat.isStreaming,
                                     isError = chat.isError,
@@ -1477,6 +1488,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun ModelChatItem(
         response: String,
+        userPrompt: String = "",
         modelUsed: String = "",
         onRetry: (String) -> Unit = {},
         isStreaming: Boolean = false,
@@ -1488,8 +1500,74 @@ class MainActivity : ComponentActivity() {
         onApiSwitch: (ApiProvider) -> Unit = {}
     ) {
         val context = LocalContext.current
+        val hapticFeedback = LocalHapticFeedback.current
         var showModelSelector by remember { mutableStateOf(false) }
+        var showExportDialog by remember { mutableStateOf(false) }
         var selectedApiProvider by remember { mutableStateOf(currentApiProvider) }
+        
+        // Unified Smooth Streaming Engine
+        // Decouples network chunks from visual display for consistent premium feel
+        
+        // Display buffer - what the user sees
+        var displayedText by remember { mutableStateOf("") }
+        
+        // Reset display when a new streaming session starts
+        LaunchedEffect(isStreaming) {
+            if (isStreaming) {
+                displayedText = ""
+            } else if (response.isNotEmpty()) {
+                // Ensure final text is shown when streaming stops
+                displayedText = response
+            }
+        }
+        
+        // Stable reference to target text (network buffer)
+        val currentResponse by rememberUpdatedState(response)
+        
+        // Animation Loop
+        LaunchedEffect(isStreaming) {
+            if (isStreaming) {
+                while (true) {
+                    val target = currentResponse
+                    val current = displayedText
+                    
+                    if (current.length < target.length) {
+                        val diff = target.length - current.length
+                        
+                        // Adaptive Speed Algorithm
+                        // Adjusts typing speed based on how far behind we are
+                        val (charsToProcess, delayMs) = when {
+                            diff > 50 -> 5 to 5L    // Catch up fast (Gemini chunks)
+                            diff > 20 -> 2 to 10L   // Medium catch up
+                            diff > 5 -> 1 to 15L    // Slight lag, speed up a bit
+                            else -> 1 to 30L        // Natural typing speed
+                        }
+                        
+                        // Update Display
+                        val nextIndex = (current.length + charsToProcess).coerceAtMost(target.length)
+                        val newText = target.substring(0, nextIndex)
+                        displayedText = newText
+                        
+                        // Unified Haptics
+                        // Trigger every 3 characters of DISPLAYED text
+                        // This ensures sync regardless of network chunk size
+                        if (newText.length % 3 == 0) {
+                             hapticFeedback.performHapticFeedback(
+                                 androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove
+                             )
+                        }
+                        
+                        delay(delayMs)
+                    } else {
+                        // Buffer empty, wait for more chunks
+                        delay(50)
+                        
+                        // Break if streaming finished and we caught up
+                        if (!isStreaming && current.length == target.length) break
+                    }
+                }
+            }
+        }
         
         // Extract brand name from model (memoized)
         val brandName = remember(modelUsed) {
@@ -1596,22 +1674,27 @@ class MainActivity : ComponentActivity() {
                     
                     Spacer(modifier = Modifier.height(8.dp))
                     
-                    // Render markdown with code block enhancements or error text with fade-in animation
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = response.isNotEmpty(),
-                        enter = androidx.compose.animation.fadeIn(
-                            animationSpec = androidx.compose.animation.core.tween(200)
-                        )
-                    ) {
+                    // Render text - use plain text during OpenRouter animation, markdown when complete
+                    if (displayedText.isNotEmpty()) {
                         if (isError) {
                             Text(
-                                text = response,
+                                text = displayedText,
                                 fontSize = 16.sp,
                                 color = Color(0xFFFF3B30), // Red color for errors
                                 fontFamily = FontFamily.Monospace
                             )
+                        } else if (isStreaming) {
+                            // Plain text during streaming for instant rendering (Unified Engine)
+                            Text(
+                                text = displayedText,
+                                fontSize = 16.sp,
+                                color = Color.White,
+                                lineHeight = 22.sp,
+                                modifier = Modifier.fillMaxWidth()
+                            )
                         } else {
-                            MarkdownWithCodeCopy(response = response, context = context)
+                            // Markdown rendering for Gemini or completed responses
+                            MarkdownWithCodeCopy(response = displayedText, context = context)
                         }
                     }
                 }
@@ -1705,6 +1788,19 @@ class MainActivity : ComponentActivity() {
                     Icon(
                         imageVector = Icons.Rounded.Refresh,
                         contentDescription = "Retry with different model",
+                        tint = Color(0xFF8E8E93),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                
+                // Export PDF button
+                IconButton(
+                    onClick = { showExportDialog = true },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.PictureAsPdf,
+                        contentDescription = "Export PDF",
                         tint = Color(0xFF8E8E93),
                         modifier = Modifier.size(18.dp)
                     )
@@ -1948,6 +2044,32 @@ class MainActivity : ComponentActivity() {
                             )
                         ) {
                             Text("Cancel", fontSize = 15.sp)
+                        }
+                    }
+                )
+            }
+            
+            // Export Dialog
+            if (showExportDialog) {
+                AlertDialog(
+                    onDismissRequest = { showExportDialog = false },
+                    containerColor = Color(0xFF2C2C2E),
+                    title = { Text("Export Response", color = Color.White) },
+                    text = { Text("Choose how you want to export this response as PDF.", color = Color(0xFFE5E5E5)) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            showExportDialog = false
+                            PdfGenerator.exportToPdf(context, response, brandName, modelUsed, userPrompt)
+                        }) {
+                            Text("Save to Device", color = Color(0xFF00D9FF))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = {
+                            showExportDialog = false
+                            PdfGenerator.sharePdf(context, response, brandName, modelUsed, userPrompt)
+                        }) {
+                            Text("Share PDF", color = Color(0xFF00D9FF))
                         }
                     }
                 )

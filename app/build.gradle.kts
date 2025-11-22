@@ -100,6 +100,9 @@ dependencies {
     
     // Markdown rendering for chat responses
     implementation("com.github.jeziellago:compose-markdown:0.5.4")
+    
+    // CommonMark 0.13.0 (matches version in compose-markdown to avoid conflicts)
+    implementation("com.atlassian.commonmark:commonmark:0.13.0")
 }
 
 
