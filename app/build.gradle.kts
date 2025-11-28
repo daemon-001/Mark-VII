@@ -114,6 +114,9 @@ dependencies {
     // PDF generation
     implementation("com.itextpdf:itext7-core:7.2.5")
     implementation("com.itextpdf:html2pdf:4.0.5")
+    
+    // MLKit Language Identification for TextToSpeech
+    implementation("com.google.mlkit:language-id:17.0.6")
 }
 
 

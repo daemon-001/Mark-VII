@@ -14,6 +14,8 @@ import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.widget.Toast
+import com.google.mlkit.nl.languageid.LanguageIdentification
+import com.google.mlkit.nl.languageid.LanguageIdentificationOptions
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.lifecycle.lifecycleScope
@@ -223,7 +225,7 @@ class MainActivity : AppCompatActivity() {
         textToSpeech = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 isTtsInitialized = true
-                textToSpeech?.language = java.util.Locale.US
+                // Language will be set dynamically based on detected content
             }
         }
         
@@ -1882,13 +1884,13 @@ class MainActivity : AppCompatActivity() {
                         clipboard.setPrimaryClip(clip)
                         Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
                     },
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.ContentCopy,
                         contentDescription = "Copy",
                         tint = Color(0xFF8E8E93),
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 
@@ -1898,6 +1900,7 @@ class MainActivity : AppCompatActivity() {
                         if (isTtsInitialized && textToSpeech != null) {
                             if (textToSpeech!!.isSpeaking) {
                                 textToSpeech?.stop()
+                                Toast.makeText(context, "Speech stopped", Toast.LENGTH_SHORT).show()
                             } else {
                             // Remove markdown formatting for better speech
                                 val cleanText = response
@@ -1916,13 +1919,13 @@ class MainActivity : AppCompatActivity() {
                             Toast.makeText(context, "Text-to-speech not ready", Toast.LENGTH_SHORT).show()
                         }
                     },
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.VolumeUp,
                         contentDescription = "Speak",
                         tint = Color(0xFF8E8E93),
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 
@@ -1931,26 +1934,26 @@ class MainActivity : AppCompatActivity() {
                     onClick = {
                         showModelSelector = true
                     },
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Refresh,
                         contentDescription = "Retry with different model",
                         tint = Color(0xFF8E8E93),
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 
                 // Export PDF button
                 IconButton(
                     onClick = { showExportDialog = true },
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.PictureAsPdf,
                         contentDescription = "Export PDF",
                         tint = Color(0xFF8E8E93),
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 
@@ -1964,13 +1967,13 @@ class MainActivity : AppCompatActivity() {
                         }
                         context.startActivity(Intent.createChooser(shareIntent, "Share response"))
                     },
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Share,
                         contentDescription = "Share",
                         tint = Color(0xFF8E8E93),
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -2226,6 +2229,55 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun speakText(text: String) {
+        if (textToSpeech == null) return
+        
+        // Detect language using MLKit
+        val languageIdentifier = LanguageIdentification.getClient(
+            LanguageIdentificationOptions.Builder()
+                .setConfidenceThreshold(0.34f)
+                .build()
+        )
+        
+        languageIdentifier.identifyLanguage(text)
+            .addOnSuccessListener { languageCode ->
+                if (languageCode != "und") {
+                    // Map MLKit language codes to Locale
+                    val locale = when (languageCode) {
+                        "zh" -> java.util.Locale.SIMPLIFIED_CHINESE
+                        "zh-Hant" -> java.util.Locale.TRADITIONAL_CHINESE
+                        "ja" -> java.util.Locale.JAPANESE
+                        "ko" -> java.util.Locale.KOREAN
+                        "es" -> java.util.Locale("es")
+                        "fr" -> java.util.Locale.FRENCH
+                        "de" -> java.util.Locale.GERMAN
+                        "it" -> java.util.Locale.ITALIAN
+                        "pt" -> java.util.Locale("pt")
+                        "ru" -> java.util.Locale("ru")
+                        "ar" -> java.util.Locale("ar")
+                        "hi" -> java.util.Locale("hi")
+                        "en" -> java.util.Locale.US
+                        else -> java.util.Locale.US
+                    }
+                    
+                    // Set language if available
+                    val result = textToSpeech?.setLanguage(locale)
+                    if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                        // Fallback to English if language not supported
+                        textToSpeech?.setLanguage(java.util.Locale.US)
+                    }
+                }
+                
+                // Speak the text after setting language
+                speakTextWithLanguage(text)
+            }
+            .addOnFailureListener {
+                // If detection fails, use English as fallback
+                textToSpeech?.setLanguage(java.util.Locale.US)
+                speakTextWithLanguage(text)
+            }
+    }
+    
+    private fun speakTextWithLanguage(text: String) {
         if (textToSpeech == null) return
         
         val maxLength = TextToSpeech.getMaxSpeechInputLength() - 100 // Buffer
