@@ -94,6 +94,13 @@ dependencies {
     implementation("com.google.firebase:firebase-database-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-analytics-ktx")
+    implementation("com.google.firebase:firebase-auth-ktx")
+    
+    // Google Sign-In
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
     
     // Gemini AI SDK
     implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
@@ -103,6 +110,10 @@ dependencies {
     
     // CommonMark 0.13.0 (matches version in compose-markdown to avoid conflicts)
     implementation("com.atlassian.commonmark:commonmark:0.13.0")
+    
+    // PDF generation
+    implementation("com.itextpdf:itext7-core:7.2.5")
+    implementation("com.itextpdf:html2pdf:4.0.5")
 }
 
 

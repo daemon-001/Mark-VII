@@ -16,6 +16,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.lifecycle.lifecycleScope
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloat
@@ -65,6 +66,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -77,6 +79,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -129,10 +134,12 @@ import com.daemon.markvii.data.ChatData
 import com.daemon.markvii.data.ModelInfo
 import com.daemon.markvii.data.FirebaseConfigManager
 import com.daemon.markvii.ui.theme.MarkVIITheme
+import com.daemon.markvii.ui.theme.LocalAppColors
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import dev.jeziellago.compose.markdowntext.MarkdownText
 import kotlinx.coroutines.delay
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.rememberUpdatedState
 import org.commonmark.parser.Parser
@@ -143,10 +150,14 @@ import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Share
 
 
-class MainActivity : ComponentActivity() {
+import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.material3.ModalDrawerSheet
+
+class MainActivity : AppCompatActivity() {
 
     private val uriState = MutableStateFlow("")
     private val voiceInputState = MutableStateFlow("")
+    private val isSigningInState = MutableStateFlow(false)
     
     private var textToSpeech: TextToSpeech? = null
     private var isTtsInitialized = false
@@ -172,6 +183,29 @@ class MainActivity : ComponentActivity() {
             }
             }
         }
+    
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        
+        if (requestCode == com.daemon.markvii.data.AuthManager.RC_SIGN_IN) {
+            lifecycleScope.launch {
+                val result = com.daemon.markvii.data.AuthManager.handleSignInResult(data)
+                result.onSuccess {
+                    // Sign-in successful, state will update automatically
+                    isSigningInState.value = false
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity, "Sign in successful!", Toast.LENGTH_SHORT).show()
+                    }
+                }.onFailure { error ->
+                    // Sign-in failed, reset loading state
+                    isSigningInState.value = false
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity, "Sign in failed: ${error.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -181,6 +215,9 @@ class MainActivity : ComponentActivity() {
         
         // Initialize ChatHistoryManager
         com.daemon.markvii.data.ChatHistoryManager.init(applicationContext)
+        
+        // Initialize ThemePreferences
+        com.daemon.markvii.data.ThemePreferences.init(applicationContext)
         
         // Initialize TextToSpeech
         textToSpeech = TextToSpeech(this) { status ->
@@ -193,15 +230,24 @@ class MainActivity : ComponentActivity() {
         // Set window background to black to prevent white flash when keyboard appears
         window.decorView.setBackgroundColor(android.graphics.Color.BLACK)
         
+        // Set status bar color to match top bar gradient
+        window.statusBarColor = android.graphics.Color.parseColor("#1A1A2E")
+        
         setContent {
+            // Observe theme changes
+            val currentTheme by com.daemon.markvii.data.ThemePreferences.currentTheme.collectAsState()
+            val darkTheme = when (currentTheme) {
+                com.daemon.markvii.data.AppTheme.LIGHT -> false
+                com.daemon.markvii.data.AppTheme.DARK -> true
+                com.daemon.markvii.data.AppTheme.SYSTEM_DEFAULT -> isSystemInDarkTheme()
+            }
 
-            MarkVIITheme {
+            MarkVIITheme(darkTheme = darkTheme) {
                 var opentimes by remember { mutableIntStateOf(0) }
                 // A surface container using the 'background' color from the theme
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = Color.Black
-//                    color = MaterialTheme.colorScheme.background
+                    color = MaterialTheme.colorScheme.background
                 )
 
                 {
@@ -213,93 +259,151 @@ class MainActivity : ComponentActivity() {
                             
                             // ViewModel needs to be at this scope to be accessible by both topBar and content
                             val chaViewModel = viewModel<ChatViewModel>()
+                            val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+                            val coroutineScope = rememberCoroutineScope()
+                            var showSettings by remember { mutableStateOf(false) } // Settings screen state
+                            val isSigningIn by isSigningInState.collectAsState() // Sign-in loading state from Activity
+                            val chatState by chaViewModel.chatState.collectAsState()
+                            val appColors = LocalAppColors.current // Get theme colors
                             
+                            Box(modifier = Modifier.fillMaxSize()) {
+                            ModalNavigationDrawer(
+                                drawerState = drawerState,
+                                drawerContent = {
+                                    ModalDrawerSheet {
+                                        DrawerContent(
+                                            chatViewModel = chaViewModel,
+                                            onDismiss = {
+                                                coroutineScope.launch {
+                                                    drawerState.close()
+                                                }
+                                            },
+                                            onSettingsClick = {
+                                                coroutineScope.launch {
+                                                    drawerState.close()
+                                                }
+                                                showSettings = true
+                                            },
+                                            onSigningInChanged = { signing ->
+                                                isSigningInState.value = signing
+                                            }
+                                        )
+                                    }
+                                },
+                                gesturesEnabled = true
+                            ) {
                             Scaffold(
 //                                top bar items
                                 topBar = {
+                                    var showClearDialog by remember { mutableStateOf(false) }
+                                    // Optimize: Only collect user state, not entire chat state to prevent lag during streaming
+                                    val currentUser by com.daemon.markvii.data.AuthManager.currentUser.collectAsState()
+                                    
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(MaterialTheme.colorScheme.primary)
-                                        .height(50.dp)
-                                        .padding(start = 20.dp, end = 5.dp)
+                                        .background(appColors.topBarBackground)
+                                        .height(64.dp)
+                                        .padding(horizontal = 12.dp)
                                 ) {
-                                    // Mark VII header title
-                                    Text(
-                                        text = "Mark VII",
-                                        fontSize = 22.sp,
-                                        fontFamily = FontFamily(Font(R.font.typographica)),
-                                        color = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.align(Alignment.CenterStart)
-                                    )
-                                    
-                                    // Clear chat history button
-                                    var showClearDialog by remember { mutableStateOf(false) }
-                                    
                                     Row(
-                                        modifier = Modifier.align(Alignment.CenterEnd),
-                                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                        modifier = Modifier.fillMaxSize(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        // Clear chat icon
-                                        Icon(
-                                            modifier = Modifier
-                                                .size(28.dp)
-                                                .clickable {
-                                                    showClearDialog = true
+                                        // Left side: Drawer Icon / Profile Picture + Title
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Start,
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            // Drawer Icon / Profile Picture
+                                            IconButton(
+                                                onClick = {
+                                                    coroutineScope.launch {
+                                                        if (drawerState.isOpen) {
+                                                            drawerState.close()
+                                                        } else {
+                                                            drawerState.open()
+                                                        }
+                                                    }
                                                 },
-                                            imageVector = Icons.Rounded.Delete,
-                                            contentDescription = "Clear Chat History",
-                                            tint = MaterialTheme.colorScheme.onPrimary
-                                        )
-
-                                        // Info tab icon
-                                        val composition by rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.info_card))
-                                        LottieAnimation(
-                                            composition = composition,
-                                            modifier = Modifier
-                                                .size(60.dp)
-                                                .clickable {
-                                                    navController.navigate("info_screen")
-                                                },
-                                            iterations = LottieConstants.IterateForever  // Play in loop
-                                        )
-                                    }
-                                    
-                                    // Clear chat confirmation dialog
-                                    if (showClearDialog) {
-                                        AlertDialog(
-                                            onDismissRequest = { showClearDialog = false },
-                                            title = { Text("Clear Chat History?") },
-                                            text = { Text("This will permanently delete all chat messages. This action cannot be undone.") },
-                                            confirmButton = {
-                                                TextButton(
-                                                    onClick = {
-                                                        chaViewModel.clearChatHistory()
-                                                        showClearDialog = false
-                                                    },
-                                                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                                                        contentColor = Color(0xFFFF3B30)
+                                                modifier = Modifier.size(48.dp)
+                                            ) {
+                                                val user = currentUser
+                                                if (user?.photoUrl != null) {
+                                                    // User Profile Picture
+                                                    androidx.compose.foundation.Image(
+                                                        painter = rememberAsyncImagePainter(
+                                                            model = ImageRequest.Builder(LocalContext.current)
+                                                                .data( user.photoUrl)
+                                                                .crossfade(true)
+                                                                .build()
+                                                        ),
+                                                        contentDescription = "Profile",
+                                                        contentScale = ContentScale.Crop,
+                                                        modifier = Modifier
+                                                            .size(32.dp)
+                                                            .clip(CircleShape)
+                                                            .border(1.dp, appColors.accent, CircleShape)
                                                     )
-                                                ) {
-                                                    Text("Clear")
+                                                } else {
+                                                    // Standard Hamburger Menu
+                                                    Icon(
+                                                        imageVector = Icons.Rounded.Menu,
+                                                        contentDescription = "Menu",
+                                                        tint = appColors.accent,
+                                                        modifier = Modifier.size(24.dp)
+                                                    )
                                                 }
-                                            },
-                                            dismissButton = {
-                                                TextButton(
-                                                    onClick = { showClearDialog = false }
-                                                ) {
-                                                    Text("Cancel")
-                                                }
-                                            },
-                                            containerColor = Color(0xFF1C1C1E),
-                                            titleContentColor = Color.White,
-                                            textContentColor = Color(0xFFE5E5E5)
-                                        )
+                                            }
+                                            
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            
+                                            // Title with custom font
+                                            Text(
+                                                text = "MARK",
+                                                fontSize = 24.sp,
+                                                fontFamily = FontFamily(Font(R.font.typographica)),
+                                                color = Color.White,
+                                                letterSpacing = 1.sp
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "VII",
+                                                fontSize = 24.sp,
+                                                fontFamily = FontFamily(Font(R.font.typographica)),
+                                                color = Color(0xFF00D9FF),
+                                                letterSpacing = 1.sp
+                                            )
+                                        }
+                                        
+                                        // Right side: Action icons
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            // Info icon (Lottie animation)
+                                            val composition by rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.info_card))
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(48.dp)
+                                                    .clickable { navController.navigate("info_screen") },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                LottieAnimation(
+                                                    composition = composition,
+                                                    modifier = Modifier.size(48.dp),
+                                                    iterations = LottieConstants.IterateForever
+                                                )
+                                            }
+                                        }
                                     }
                                 }
+                            },
 
 //                                    Show welcome guide once when app opens (no API call)
+                                bottomBar = {
                                 if(opentimes==1){
                                     chaViewModel.showWelcomeGuide()
                                 }
@@ -307,6 +411,54 @@ class MainActivity : ComponentActivity() {
                             ) {
                                 ChatScreen(paddingValues = it)  // starting chat screen ui
                             }
+                            } // End ModalNavigationDrawer
+                            
+                            // Settings screen overlay
+                            if (showSettings) {
+                                // Handle back button when settings is open
+                                androidx.activity.compose.BackHandler {
+                                    showSettings = false
+                                }
+                                
+                                SettingsScreen(
+                                    onBackClick = { showSettings = false },
+                                    onSignOut = {
+                                        chaViewModel.onEvent(ChatUiEvent.SignOut)
+                                        showSettings = false
+                                    },
+                                    onThemeChanged = { /* Theme change is handled via StateFlow */ }
+                                )
+                            }
+                            
+                            // Loading overlay during sign-in - covers entire app
+                            if (isSigningIn) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.7f))
+                                        .clickable(enabled = false) { },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                                    ) {
+                                        androidx.compose.material3.CircularProgressIndicator(
+                                            modifier = Modifier.size(56.dp),
+                                            color = Color(0xFF00D9FF),
+                                            strokeWidth = 5.dp
+                                        )
+                                        Text(
+                                            text = "Signing in with Google...",
+                                            fontSize = 18.sp,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+                            
+                            } // Box
 
                         }
                         composable("info_screen",){
@@ -472,6 +624,7 @@ class MainActivity : ComponentActivity() {
         var isLoadingModels by remember { mutableStateOf(false) }
         var freeModels by remember { mutableStateOf<List<ModelInfo>>(emptyList()) }
         var modelsLoadError by remember { mutableStateOf<String?>(null) }
+        val appColors = LocalAppColors.current // Get theme colors for outer scope
         
         // Observe Firebase API keys and Gemini models
         val firebaseApiKey by FirebaseConfigManager.apiKey.collectAsState()
@@ -531,7 +684,7 @@ class MainActivity : ComponentActivity() {
         if (isLoadingModels) {
             AlertDialog(
                 onDismissRequest = { },
-                containerColor = Color(0xFF2C2C2E),
+                containerColor = MaterialTheme.colorScheme.surface,
                 shape = RoundedCornerShape(20.dp),
                 title = null,
                 text = {
@@ -542,13 +695,13 @@ class MainActivity : ComponentActivity() {
                     ) {
                         androidx.compose.material3.CircularProgressIndicator(
                             modifier = Modifier.size(60.dp),
-                            color = Color(0xFF00D9FF),
+                            color = appColors.accent,
                             strokeWidth = 4.dp
                         )
                         Text(
                             text = "Loading free models...",
                             fontSize = 16.sp,
-                            color = Color(0xFFE5E5E5),
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontFamily = FontFamily(Font(R.font.typographica))
                         )
                     }
@@ -703,10 +856,10 @@ class MainActivity : ComponentActivity() {
                                     prompt = chat.prompt, bitmap = chat.bitmap
                                 )
                             } else {
-                                // Get the previous user message for retry
-                                val previousUserChat = if (index < chatState.chatList.size - 1) {
-                                    chatState.chatList.getOrNull(index + 1)
-                                } else null
+                                // Get the nearest previous user message for retry (skip error/model entries)
+                                val previousUserChat = chatState.chatList
+                                    .drop(index + 1)
+                                    .firstOrNull { it.isFromUser }
                                 
                                 ModelChatItem(
                                     response = chat.prompt,
@@ -768,10 +921,10 @@ class MainActivity : ComponentActivity() {
                             .fillMaxWidth()
                             .padding(bottom = 12.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(Color(0xFF2C2C2E))
+                            .background(appColors.surfaceVariant)
                             .border(
                                 width = 1.dp,
-                                color = Color(0xFF3A3A3C),
+                                color = appColors.divider,
                                 shape = RoundedCornerShape(16.dp)
                             )
                             .padding(10.dp)
@@ -785,7 +938,7 @@ class MainActivity : ComponentActivity() {
                             Icon(
                                 painter = painterResource(id = R.drawable.ic_pin),
                                 contentDescription = "Pinned image",
-                                tint = Color(0xFFAAAAAA),
+                                tint = appColors.textSecondary,
                                 modifier = Modifier.size(18.dp)
                             )
                             
@@ -802,7 +955,7 @@ class MainActivity : ComponentActivity() {
                             // Image text
                             Text(
                                 text = "Image attached",
-                                color = Color(0xFFE5E5E5),
+                                color = MaterialTheme.colorScheme.onSurface,
                                 fontSize = 14.sp,
                                 modifier = Modifier.weight(1f)
                             )
@@ -811,7 +964,7 @@ class MainActivity : ComponentActivity() {
                             Icon(
                                 imageVector = Icons.Rounded.Close,
                                 contentDescription = "Remove image",
-                                tint = Color(0xFFAAAAAA),
+                                tint = appColors.textSecondary,
                                 modifier = Modifier
                                     .size(20.dp)
                                     .clickable {
@@ -834,10 +987,10 @@ class MainActivity : ComponentActivity() {
                                 spotColor = Color.Black.copy(alpha = 0.4f)
                             )
                             .clip(RoundedCornerShape(20.dp))
-                            .background(Color(0xFF2C2C2E))
+                            .background(appColors.surfaceVariant)
                             .border(
                                 width = 1.dp,
-                                color = Color(0xFF3A3A3C),
+                                color = appColors.divider,
                                 shape = RoundedCornerShape(20.dp)
                             )
                     ) {
@@ -858,26 +1011,26 @@ class MainActivity : ComponentActivity() {
                                     Text(
                                         text = "Ask Mark VII...",
                                         fontSize = 14.sp,
-                                        color = Color(0xFF8E8E93)
+                                        color = appColors.textSecondary
                                     )
                                 },
                                 textStyle = androidx.compose.ui.text.TextStyle(
                                     fontSize = 15.sp,
-                                    color = Color(0xFFE5E5E5),
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     lineHeight = 20.sp
                                 ),
                     colors = TextFieldDefaults.colors(
-                                    focusedTextColor = Color(0xFFE5E5E5),
-                                    unfocusedTextColor = Color(0xFFE5E5E5),
+                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                                     focusedContainerColor = Color.Transparent,
                                     unfocusedContainerColor = Color.Transparent,
                                     disabledContainerColor = Color.Transparent,
                                     focusedIndicatorColor = Color.Transparent,
                                     unfocusedIndicatorColor = Color.Transparent,
                                     disabledIndicatorColor = Color.Transparent,
-                                    cursorColor = Color(0xFFE5E5E5),
-                                    focusedPlaceholderColor = Color(0xFF8E8E93),
-                                    unfocusedPlaceholderColor = Color(0xFF8E8E93)
+                                    cursorColor = MaterialTheme.colorScheme.onSurface,
+                                    focusedPlaceholderColor = appColors.textSecondary,
+                                    unfocusedPlaceholderColor = appColors.textSecondary
                                 )
                             )
                             
@@ -918,7 +1071,7 @@ class MainActivity : ComponentActivity() {
                                                 "Model Selector"
                                             },
                                             fontSize = 13.sp,
-                                            color = Color(0xFFE5E5E5),
+                                            color = MaterialTheme.colorScheme.onSurface,
                                             style = MaterialTheme.typography.bodyMedium,
                                             lineHeight = 13.sp,
                                             maxLines = 1,
@@ -928,7 +1081,7 @@ class MainActivity : ComponentActivity() {
                                         Icon(
                                             painter = painterResource(id = R.drawable.drop_down_ic),
                                             contentDescription = "Select model",
-                                            tint = Color(0xFFE5E5E5),
+                                            tint = MaterialTheme.colorScheme.onSurface,
                                             modifier = Modifier.size(14.dp)
                                         )
                                     }
@@ -944,10 +1097,10 @@ class MainActivity : ComponentActivity() {
                                                 spotColor = Color.Black.copy(alpha = 0.5f)
                                             )
                                             .clip(RoundedCornerShape(20.dp))
-                                            .background(Color(0xFF2C2C2E))
+                                            .background(MaterialTheme.colorScheme.surface)
                                             .border(
                                                 width = 1.dp,
-                                                color = Color(0xFF3A3A3C),
+                                                color = appColors.divider,
                                                 shape = RoundedCornerShape(20.dp)
                                             )
                                     ) {
@@ -957,9 +1110,9 @@ class MainActivity : ComponentActivity() {
                                             modifier = Modifier
                                                 .width(280.dp)
                                                 .heightIn(max = 450.dp)
-                                                .background(Color(0xFF2C2C2E)),
+                                                .background(MaterialTheme.colorScheme.surface),
                                             shape = RoundedCornerShape(20.dp),
-                                            containerColor = Color(0xFF2C2C2E)
+                                            containerColor = MaterialTheme.colorScheme.surface
                                         ) {
                                             // API Provider Switch at the top
                                             Column(
@@ -979,9 +1132,9 @@ class MainActivity : ComponentActivity() {
                                                             .clip(RoundedCornerShape(10.dp))
                                                             .background(
                                                                 if (currentApiProvider == ApiProvider.GEMINI)
-                                                                    Color(0xFF00D9FF).copy(alpha = 0.2f)
+                                                                    appColors.accent.copy(alpha = 0.2f)
                                                                 else
-                                                                    Color(0xFF3A3A3C)
+                                                                    appColors.surfaceTertiary
                                                             )
                                                             .clickable {
                                                                 chaViewModel.onEvent(
@@ -994,9 +1147,9 @@ class MainActivity : ComponentActivity() {
                                                         Text(
                                                             text = "Gemini",
                                                             color = if (currentApiProvider == ApiProvider.GEMINI)
-                                                                Color(0xFF00D9FF)
+                                                                appColors.accent
                                                             else
-                                                                Color(0xFF8E8E93),
+                                                                appColors.textSecondary,
                                                             fontSize = 13.sp,
                                                             fontWeight = if (currentApiProvider == ApiProvider.GEMINI)
                                                                 FontWeight.SemiBold
@@ -1014,9 +1167,9 @@ class MainActivity : ComponentActivity() {
                                                             .clip(RoundedCornerShape(10.dp))
                                                             .background(
                                                                 if (currentApiProvider == ApiProvider.OPENROUTER)
-                                                                    Color(0xFF00D9FF).copy(alpha = 0.2f)
+                                                                    appColors.accent.copy(alpha = 0.2f)
                                                                 else
-                                                                    Color(0xFF3A3A3C)
+                                                                    appColors.surfaceTertiary
                                                             )
                                                             .clickable {
                                                                 chaViewModel.onEvent(
@@ -1029,9 +1182,9 @@ class MainActivity : ComponentActivity() {
                                                         Text(
                                                             text = "OpenRouter",
                                                             color = if (currentApiProvider == ApiProvider.OPENROUTER)
-                                                                Color(0xFF00D9FF)
+                                                                appColors.accent
                                                             else
-                                                                Color(0xFF8E8E93),
+                                                                appColors.textSecondary,
                                                             fontSize = 13.sp,
                                                             fontWeight = if (currentApiProvider == ApiProvider.OPENROUTER)
                                                                 FontWeight.SemiBold
@@ -1047,7 +1200,7 @@ class MainActivity : ComponentActivity() {
                                                         .fillMaxWidth()
                                                         .padding(vertical = 8.dp)
                                                         .height(1.dp)
-                                                        .background(Color(0xFF3A3A3C))
+                                                        .background(appColors.divider)
                                                 )
                                             }
                                             
@@ -1060,7 +1213,7 @@ class MainActivity : ComponentActivity() {
                                             ) {
                                                 Text(
                                                     text = "No models available",
-                                                    color = Color(0xFF8E8E93),
+                                                    color = appColors.textSecondary,
                                                     fontSize = 14.sp,
                                                     style = MaterialTheme.typography.bodyMedium
                                                 )
@@ -1085,9 +1238,9 @@ class MainActivity : ComponentActivity() {
                                                                         .clip(CircleShape)
                                                                         .background(
                                                                             if (model.isAvailable) 
-                                                                                Color(0xFF00D9FF) 
+                                                                                appColors.accent 
                                                                             else 
-                                                                                Color(0xFF8E8E93)
+                                                                                appColors.textSecondary
                                                                         )
                                                                 )
                                                                 
@@ -1197,7 +1350,7 @@ class MainActivity : ComponentActivity() {
                         Icon(
                                         imageVector = Icons.Rounded.Mic,
                                         contentDescription = "Voice input",
-                                        tint = Color(0xFFE5E5E5),
+                                        tint = MaterialTheme.colorScheme.onSurface,
                                         modifier = Modifier.size(22.dp)
                                     )
                                 }
@@ -1210,11 +1363,11 @@ class MainActivity : ComponentActivity() {
                                         .clip(CircleShape)
                                         .background(
                                             if (chatState.isGeneratingResponse) {
-                                                Color(0xFFFF3B30) // Red when streaming
+                                                appColors.error // Red when streaming
                                             } else if (chatState.prompt.isNotEmpty() || bitmap != null) {
-                                                Color(0xFFE5E5E5)
+                                                appColors.accent
                                             } else {
-                                                Color(0xFF3A3A3C)
+                                                appColors.surfaceTertiary
                                             }
                                         )
                                         .clickable(
@@ -1260,7 +1413,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
-        }
+        } // ModalNavigationDrawer
 
     }
 
@@ -1746,7 +1899,7 @@ class MainActivity : ComponentActivity() {
                             if (textToSpeech!!.isSpeaking) {
                                 textToSpeech?.stop()
                             } else {
-                                // Remove markdown formatting for better speech
+                            // Remove markdown formatting for better speech
                                 val cleanText = response
                                     .replace("```[a-zA-Z]*\\n".toRegex(), "")
                                     .replace("```", "")
@@ -1756,12 +1909,7 @@ class MainActivity : ComponentActivity() {
                                     .replace("`", "")
                                     .trim()
                                 
-                                textToSpeech?.speak(
-                                    cleanText,
-                                    TextToSpeech.QUEUE_FLUSH,
-                                    null,
-                                    null
-                                )
+                                speakText(cleanText)
                                 Toast.makeText(context, "Speaking...", Toast.LENGTH_SHORT).show()
                             }
                         } else {
@@ -2073,6 +2221,44 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 )
+            }
+        }
+    }
+
+    private fun speakText(text: String) {
+        if (textToSpeech == null) return
+        
+        val maxLength = TextToSpeech.getMaxSpeechInputLength() - 100 // Buffer
+        
+        if (text.length <= maxLength) {
+            textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+            return
+        }
+        
+        // Flush existing
+        textToSpeech?.speak("", TextToSpeech.QUEUE_FLUSH, null, null)
+        
+        var remainingText = text
+        while (remainingText.isNotEmpty()) {
+            val chunk = if (remainingText.length > maxLength) {
+                // Find a good break point
+                val splitIndex = remainingText.lastIndexOf('.', maxLength)
+                    .takeIf { it > 0 }
+                    ?: remainingText.lastIndexOf(' ', maxLength)
+                    .takeIf { it > 0 }
+                    ?: maxLength
+                
+                remainingText.substring(0, splitIndex)
+            } else {
+                remainingText
+            }
+            
+            textToSpeech?.speak(chunk, TextToSpeech.QUEUE_ADD, null, null)
+            
+            remainingText = if (chunk.length < remainingText.length) {
+                remainingText.substring(chunk.length).trim()
+            } else {
+                ""
             }
         }
     }

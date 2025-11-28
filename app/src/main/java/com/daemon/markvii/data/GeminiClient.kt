@@ -5,6 +5,7 @@ import android.util.Log
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
 import com.google.ai.client.generativeai.type.generationConfig
+import com.google.ai.client.generativeai.type.Content
 
 /**
  * Gemini API client for direct Google AI integration
@@ -47,12 +48,32 @@ object GeminiClient {
     }
     
     /**
-     * Generate text response from prompt
+     * Generate text response from prompt with conversation history
      */
-    suspend fun generateContent(prompt: String, modelName: String = "gemini-1.5-flash"): Chat {
+    suspend fun generateContent(
+        prompt: String, 
+        modelName: String = "gemini-1.5-flash",
+        conversationHistory: List<Chat> = emptyList()
+    ): Chat {
         try {
             val model = getModel(modelName)
-            val response = model.generateContent(prompt)
+            
+            // If there's conversation history, use chat mode
+            val response = if (conversationHistory.isNotEmpty()) {
+                val history = conversationHistory
+                    .filter { !it.isError } // Exclude error messages
+                    .takeLast(10) // Limit to last 10 messages to avoid token limits
+                    .map { chat ->
+                        content(role = if (chat.isFromUser) "user" else "model") {
+                            text(chat.prompt)
+                        }
+                    }
+                
+                val chat = model.startChat(history = history)
+                chat.sendMessage(prompt)
+            } else {
+                model.generateContent(prompt)
+            }
             
             val responseText = response.text ?: "No response generated"
             
@@ -80,17 +101,35 @@ object GeminiClient {
     }
     
     /**
-     * Generate streaming response from prompt
+     * Generate streaming response from prompt with conversation history
      */
     suspend fun generateContentStream(
         prompt: String, 
         modelName: String = "gemini-1.5-flash",
+        conversationHistory: List<Chat> = emptyList(),
         onChunk: (String) -> Unit,
         onFinish: (finishReason: String?) -> Unit = {}
     ) {
         try {
             val model = getModel(modelName)
-            val response = model.generateContentStream(prompt)
+            
+            // If there's conversation history, use chat mode
+            val response = if (conversationHistory.isNotEmpty()) {
+                val history = conversationHistory
+                    .filter { !it.isError } // Exclude error messages
+                    .takeLast(10) // Limit to last 10 messages
+                    .map { chat ->
+                        content(role = if (chat.isFromUser) "user" else "model") {
+                            text(chat.prompt)
+                        }
+                    }
+                
+                val chat = model.startChat(history = history)
+                chat.sendMessageStream(prompt)
+            } else {
+                model.generateContentStream(prompt)
+            }
+            
             var lastFinishReason: String? = null
             var buffer = StringBuilder()
             var lastEmitTime = System.currentTimeMillis()

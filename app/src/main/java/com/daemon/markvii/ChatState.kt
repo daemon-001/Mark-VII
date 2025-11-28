@@ -21,7 +21,13 @@ data class ChatState (
     val isGeneratingResponse: Boolean = false,
     val showPromptSuggestions: Boolean = true,
     val currentApiProvider: ApiProvider = ApiProvider.GEMINI, // Gemini as default
-    val hapticTrigger: Long = 0L // Timestamp to trigger haptic feedback on chunk arrival
+    val hapticTrigger: Long = 0L, // Timestamp to trigger haptic feedback on chunk arrival
+    
+    // Authentication and session management
+    val currentUser: com.google.firebase.auth.FirebaseUser? = null,
+    val currentSessionId: String? = null,
+    val chatSessions: List<com.daemon.markvii.data.ChatSession> = emptyList(),
+    val isDrawerOpen: Boolean = false
 )
 
 

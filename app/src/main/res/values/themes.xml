@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.AIModelMARKVII" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.AIModelMARKVII" parent="Theme.AppCompat.DayNight.NoActionBar" />
 
     <style name="Theme.App.SplashScreen" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/night</item>

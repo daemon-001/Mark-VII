@@ -154,7 +154,7 @@ object ChatData {
                         )
                     )
                 ),
-                max_tokens = 2000,
+                max_tokens = 3000,
                 temperature = 0.7
             )
 
@@ -261,7 +261,7 @@ object ChatData {
                         )
                     )
                 ),
-                max_tokens = 2000,
+                max_tokens = 3000,
                 temperature = 0.7
             )
 
@@ -333,11 +333,12 @@ object ChatData {
     }
     
     /**
-     * Get streaming response from AI model
+     * Get streaming response from AI model with conversation history
      * Yields partial responses as they are generated
      */
     suspend fun getStreamingResponse(
         prompt: String,
+        conversationHistory: List<Chat> = emptyList(),
         onChunk: (String) -> Unit
     ): Chat = withContext(Dispatchers.IO) {
         try {
@@ -352,20 +353,41 @@ object ChatData {
                 else -> "anthropic/claude-3-5-sonnet-20241022"
             }
             
-            val request = OpenRouterRequest(
-                model = modelToUse,
-                messages = listOf(
+            // Build messages array from conversation history
+            val messages = mutableListOf<Message>()
+            
+            // Add conversation history (limit to last 6 messages for faster response)
+            conversationHistory.takeLast(6).forEach { chat ->
+                messages.add(
                     Message(
-                        role = "user",
+                        role = if (chat.isFromUser) "user" else "assistant",
                         content = listOf(
                             Content(
                                 type = "text",
-                                text = prompt
+                                text = chat.prompt
                             )
                         )
                     )
-                ),
-                max_tokens = 2000,
+                )
+            }
+            
+            // Add current prompt as the latest user message
+            messages.add(
+                Message(
+                    role = "user",
+                    content = listOf(
+                        Content(
+                            type = "text",
+                            text = prompt
+                        )
+                    )
+                )
+            )
+            
+            val request = OpenRouterRequest(
+                model = modelToUse,
+                messages = messages,
+                max_tokens = 3000,
                 temperature = 0.7,
                 stream = true
             )
@@ -486,9 +508,11 @@ object ChatData {
                 val modelName = try {
                     val allModels = fetchAvailableModels()
                     val foundModel = allModels.find { it.id == modelWithFree || it.id == modelId }
-                    foundModel?.name ?: modelId.substringAfterLast("/").replace("-", " ").capitalize()
+                    (foundModel?.name ?: modelId.substringAfterLast("/").replace("-", " "))
+                        .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
                 } catch (e: Exception) {
-                    modelId.substringAfterLast("/").replace("-", " ").capitalize()
+                    modelId.substringAfterLast("/").replace("-", " ")
+                        .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
                 }
                 
                 // Add to Firebase exception list with model name (this will await and save to Firestore)

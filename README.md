@@ -1,10 +1,340 @@
-# 
+# Mark VII
 
 <div align="center">
 
-<H1>Mark VII - Multi-Provider AI Chat Platform</H1>
+![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)
+![Platform](https://img.shields.io/badge/platform-Android-green.svg)
+![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg)
+![License](https://img.shields.io/badge/license-MIT-orange.svg)
 
-![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
+**Multi-provider AI chat platform with 45+ models, cloud configuration, and modern Material 3 design.**
+
+[Features](#features) • [Quick Start](#quick-start) • [Download](#download)
+
+</div>
+
+---
+
+## Overview
+
+Mark VII provides unified access to 45+ AI models from Anthropic, OpenAI, Meta, Deepseek, Mistral, Google, and more through a single Android app powered by OpenRouter and Firebase.
+
+**Key Highlights:**
+- 45+ AI models from multiple providers
+- Cloud-based configuration via Firebase
+- Dual API support (OpenRouter + Gemini)
+- Dynamic theming (Light, Dark, System)
+- Google Sign-In with chat history sync
+- PDF export and session management
+- Real-time streaming responses
+- Voice input and text-to-speech
+
+---
+
+## Features
+
+### AI Models
+Access to Claude 3.5, GPT-4, Llama 3.3/4, Deepseek R1, Mistral, Gemini 2.0, Qwen3, and 40+ more models from leading AI providers.
+
+### Cloud Configuration
+Manage models and API keys remotely through Firebase. Updates reflect instantly on app restart without requiring new builds.
+
+### Authentication & Storage
+Google Sign-In with Firebase Authentication. Chat sessions sync across devices with Firestore integration.
+
+### User Experience
+- Material 3 design with dynamic theming
+- Streaming responses with animated cursor
+- Voice input and text-to-speech
+- Markdown rendering with syntax highlighting
+- PDF export with professional formatting
+- Session management (create, rename, delete)
+- Real-time model switching
+- Stop generation anytime
+
+### Performance
+- Startup: <100ms (24x faster than v1.x)
+- Connection pooling for faster API responses
+- Memoized rendering for smooth UI
+- Optimized lazy loading
+
+---
+
+## Quick Start
+
+### Prerequisites
+- Android Studio Arctic Fox or later
+- Android SDK 24+
+- Firebase account (free)
+- OpenRouter API key (free tier available)
+
+### Setup Steps
+
+**1. Clone Repository**
+```bash
+git clone https://github.com/daemon-001/Mark-VII.git
+cd Mark-VII
+```
+
+**2. Firebase Configuration**
+
+Create project at [Firebase Console](https://console.firebase.google.com/):
+1. Add project: `Mark-VII`
+2. Add Android app: `com.daemon.markvii`
+3. Download `google-services.json` → place in `app/` folder
+4. Enable Firestore Database (test mode)
+
+**3. Firestore Data Structure**
+
+Collection: `app_config`
+- Document: `models`
+  - Field: `list` (array of model objects)
+- Document: `api_keys`
+  - Field: `openrouterApiKey` (string)
+  - Field: `geminiApiKey` (string, optional)
+
+**Quick setup with Python:**
+```bash
+cd update_models
+pip install firebase-admin
+python update_firebase_models.py --csv models.csv
+```
+
+**4. API Keys**
+
+Get OpenRouter key from [openrouter.ai/keys](https://openrouter.ai/keys) and add to Firebase `app_config/api_keys/openrouterApiKey`.
+
+**5. Build**
+```bash
+./gradlew assembleDebug
+```
+
+---
+
+## Installation
+
+### Users (APK)
+Download from [Releases](https://github.com/daemon-001/Mark-VII/releases/latest), enable "Unknown Sources", and install.
+
+### Developers (Source)
+Follow Quick Start steps above.
+
+---
+
+## Usage
+
+### Basic Chat
+1. Select model from dropdown
+2. Type message or use voice input
+3. Get streaming AI response
+4. Tap stop button to cancel anytime
+
+### Theme Management
+Open drawer → Settings → Theme → Select Light/Dark/System Default
+
+### Chat Sessions
+Create, rename, delete sessions from navigation drawer. All sessions sync with Google account.
+
+### PDF Export
+Tap menu → Export/Share PDF to save conversations with formatting.
+
+---
+
+## Management Tools
+
+### CSV Model Management
+```bash
+cd update_models
+
+# Import models
+python update_firebase_models.py --csv models.csv
+
+# List current models
+python update_firebase_models.py --list
+```
+
+**CSV Format:**
+```csv
+apiModel,displayName,isAvailable,order
+google/gemini-2.0-flash-exp,Gemini 2.0 Flash,TRUE,1
+deepseek/deepseek-r1,Deepseek R1,TRUE,2
+```
+
+Edit 50+ models in Excel/Sheets, bulk enable/disable, easy reordering.
+
+---
+
+## Troubleshooting
+
+**Firebase not configured**
+- Verify Firestore: `app_config/models` has `list` field
+- Check `app_config/api_keys` has `openrouterApiKey`
+- Ensure `google-services.json` in `app/` folder
+
+**HTTP 401 (Unauthorized)**
+- Get new key from [openrouter.ai/keys](https://openrouter.ai/keys)
+- Update Firebase: `app_config/api_keys/openrouterApiKey`
+
+**HTTP 404 (Model Not Found)**
+- Model may need `:free` suffix
+- App auto-adds to `exp_models` and retries
+- Check model exists on [OpenRouter](https://openrouter.ai/models)
+
+**HTTP 429 (Rate Limit)**
+- Wait and retry
+- Consider upgrading OpenRouter plan
+
+**Build Errors**
+```bash
+./gradlew clean
+./gradlew assembleDebug
+```
+
+---
+
+## Architecture
+
+**Stack:**
+- Language: Kotlin
+- UI: Jetpack Compose + Material 3
+- Pattern: MVVM
+- Backend: Firebase (Firestore, Auth, Analytics)
+- Networking: Retrofit + OkHttp with SSE streaming
+- Async: Coroutines + StateFlow
+- Rendering: Markdown with syntax highlighting
+
+**Project Structure:**
+```
+app/src/main/java/com/daemon/markvii/
+├── MainActivity.kt               # Main UI
+├── ChatViewModel.kt              # State management
+├── SettingsScreen.kt             # Settings UI
+├── DrawerContent.kt              # Navigation
+├── data/
+│   ├── ChatData.kt               # API logic
+│   ├── OpenRouterApi.kt          # API client
+│   ├── FirebaseConfigManager.kt  # Config management
+│   ├── AuthManager.kt            # Authentication
+│   ├── ChatHistoryManager.kt     # Session storage
+│   └── ThemePreferences.kt       # Theme state
+├── ui/theme/
+│   ├── Theme.kt                  # Theme system
+│   └── Color.kt                  # Color definitions
+└── utils/
+    └── PdfGenerator.kt           # PDF export
+
+update_models/
+├── update_firebase_models.py     # Model management
+└── models.csv                    # 49 pre-configured models
+```
+
+---
+
+## Performance
+
+**v3.0 vs v1.x:**
+
+| Metric | v1.x | v3.0 | Improvement |
+|--------|------|------|-------------|
+| Startup | 2.65s | <100ms | 24x faster |
+| Models | 5-10 | 45+ | 9x more |
+| Cost/Launch | $0.001 | $0.00 | 100% savings |
+| Configuration | Hardcoded | Cloud | Instant updates |
+| Streaming | No | Yes | Real-time |
+
+---
+
+## Dependencies
+
+**Core:**
+```gradle
+// Firebase
+firebase-bom:33.7.0
+firebase-firestore-ktx
+firebase-auth-ktx
+
+// Networking
+retrofit:2.9.0
+okhttp:4.12.0
+
+// PDF
+itext7-core:7.2.5
+html2pdf:4.0.5
+
+// UI
+compose-markdown:0.5.4
+coil-compose:2.4.0
+lottie-compose:6.6.0
+```
+
+---
+
+## Security
+
+- API keys stored in Firebase (not code)
+- HTTPS encryption for all calls
+- Google Sign-In for authentication
+- No third-party data sharing
+- Local theme preferences
+- Optional cloud sync for chat history
+
+---
+
+## Supported Models
+
+50+ models including:
+- Google: Gemini 2.0 Flash, Gemma 3 variants
+- Deepseek: Chat V3.1, R1, R1 Distill
+- Meta: Llama 3.3, 4 Maverick/Scout
+- Qwen: Qwen3 Coder, Qwen 2.5 variants
+- Mistral: Large, Small, Medium
+- Anthropic: Claude 3.5 Sonnet
+- OpenAI: GPT-4 Turbo, GPT-4
+
+See `update_models/models.csv` for complete list.
+
+---
+
+## Download
+
+**Latest Release:** [v3.0.0](https://github.com/daemon-001/Mark-VII/releases/latest)
+
+**Requirements:**
+- Android 7.0+ (API 24)
+- Target: Android 14 (API 34)
+
+---
+
+## Contributing
+
+**Report Issues:** [GitHub Issues](https://github.com/daemon-001/Mark-VII/issues)  
+**Pull Requests:** Fork → Feature branch → Test → PR with description  
+**Code Style:** Follow Kotlin conventions, meaningful names, focused functions
+
+---
+
+## Support
+
+**Developer:** Nitesh (@daemon-001)  
+**Email:** nitesh.kumar4work@gmail.com  
+**GitHub:** [daemon-001](https://github.com/daemon-001)  
+**LinkedIn:** [daemon001](https://www.linkedin.com/in/daemon001)
+
+---
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file.
+
+---
+
+<div align="center">
+
+**Made by Nitesh**
+
+*Advanced multi-provider AI chat for Android*
+
+</div>
 ![Platform](https://img.shields.io/badge/platform-Android-green.svg)
 ![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
@@ -41,7 +371,7 @@
 - **Meta:** Llama 3.3, Llama 3.1 70B/8B, Llama 4 Maverick/Scout
 - **Deepseek:** Deepseek Chat V3.1, Deepseek R1, R1 Distill
 - **Mistral:** Mistral Large, Small, Medium, Nemo
-- **Google:** Gemini 2.0 Flash, Gemma 3 variants (via OpenRouter)
+- **Google:** Gemini 2.0 Flash, Gemma 3 variants (via OpenRouter and direct Gemini API)
 - **Qwen:** Qwen3 Coder, Qwen3 235B, Qwen 2.5 variants
 - **And 40+ more models!**
 
@@ -55,20 +385,23 @@
 - **404 Auto-Recovery** - Smart error handling with retry suggestions
 
 ### Chat Features
+- **Dual API Support** - Switch between OpenRouter and direct Gemini API
 - **Text Conversations** - Chat with any AI model
 - **Image Understanding** - Upload images and ask questions (vision models)
-- **Model Switching** - Switch between models mid-conversation
-- **Chat History** - Review previous conversations
+- **Model Switching** - Switch between models and API providers mid-conversation
+- **Chat History** - Review and manage previous conversations with Google Sign-In
+- **Session Management** - Create, rename, and delete chat sessions
 - **Brand Display** - See which AI (e.g., "Mark VII x Deepseek") answered
 - **Voice Input** - Speak your prompts using voice recognition
 - **Text-to-Speech** - Listen to AI responses
 - **Copy & Share** - Easy text copying and sharing of responses
-- **Retry with Different Models** - Re-run prompts with alternate AI models
+- **PDF Export** - Save and share conversations as formatted PDFs
+- **Retry with Different Models** - Re-run prompts with alternate AI models or providers
 
 ### User Experience
 - **Instant Startup** - Welcome guide loads in <10ms
-- **Material 3 Design** - Modern, beautiful interface
-- **Dark Theme** - Eye-friendly dark color scheme with accent highlights
+- **Dynamic Theme Support** - Light, Dark, and System Default themes
+- **Material 3 Design** - Modern, beautiful interface with theme-aware colors
 - **Smooth Animations** - Lottie-powered animations and streaming cursor effects
 - **Text Selection** - Easy copy/paste support for all messages
 - **Syntax Highlighting** - Beautiful code rendering with language-specific colors
@@ -79,7 +412,11 @@
 - **Stop Generation** - Red stop button to cancel streaming responses anytime
 - **Smart Model Selection** - Dropdown with model switching mid-conversation
 - **Auto-Scroll** - Automatic scrolling to latest message
-- **No White Flash** - Black background even when keyboard appears
+- **No White Flash** - Smooth transitions with theme-appropriate backgrounds
+- **PDF Export** - Save and share conversations as professionally formatted PDFs
+- **Google Sign-In** - Secure authentication with Firebase
+- **Chat Session Management** - Create, rename, and delete chat sessions
+- **Settings Screen** - Easy access to theme selection and account management
 
 ### Management Tools
 - **CSV Import/Export** - Manage models in spreadsheets
@@ -295,9 +632,18 @@ Mark-VII/
 │       │   ├── OpenRouterApi.kt           # API client
 │       │   ├── FirebaseConfig.kt          # Firebase models
 │       │   ├── FirebaseConfigManager.kt   # Firebase operations
+│       │   ├── AuthManager.kt             # Google Sign-In
+│       │   ├── ChatHistoryManager.kt      # Chat session storage
+│       │   ├── ThemePreferences.kt        # Theme management
+│       │   ├── GeminiClient.kt            # Gemini API integration
 │       │   └── Keys.kt                    # App metadata
-│       └── ui/theme/
-│           └── Theme.kt                   # Material 3 theme
+│       ├── ui/theme/
+│       │   ├── Theme.kt                   # Material 3 theme + AppColors
+│       │   └── Color.kt                   # Theme color definitions
+│       ├── SettingsScreen.kt              # Settings UI
+│       ├── DrawerContent.kt               # Navigation drawer
+│       └── utils/
+│           └── PdfGenerator.kt            # PDF export
 ├── update_models/
 │   ├── update_firebase_models.py          # Model management
 │   ├── models.csv                         # 49 pre-configured models
@@ -312,11 +658,30 @@ Mark-VII/
 
 ### Basic Chat
 1. Open Mark VII
-2. Select a model from dropdown (e.g., "Deepseek Chat V3.1")
-3. Type your message
-4. Tap send (▲) or press the microphone to speak
-5. Get instant streaming AI response with "Mark VII x Deepseek" header
-6. Tap the red stop button (■) to cancel streaming anytime
+2. Sign in with Google (optional, for chat history sync)
+3. Select a model from dropdown (e.g., "Deepseek Chat V3.1")
+4. Type your message or use voice input (microphone icon)
+5. Tap send (▲) to get instant streaming AI response
+6. See response with "Mark VII x Deepseek" header
+7. Tap the red stop button (■) to cancel streaming anytime
+
+### Using Themes
+1. Tap the profile icon or hamburger menu to open drawer
+2. Tap the Settings icon (gear)
+3. Under "Appearance", tap the Theme selector
+4. Choose from:
+   - **System Default** - Follows device theme
+   - **Light** - Clean, bright interface
+   - **Dark** - Eye-friendly dark mode
+5. Theme changes apply instantly without restarting
+
+### Managing Chat Sessions
+1. Open the navigation drawer (swipe right or tap menu)
+2. View all your chat sessions
+3. Tap a session to switch to it
+4. Long-press a session to rename or delete
+5. Tap "New Chat" to start a fresh conversation
+6. All sessions sync with your Google account
 
 ### Image Understanding
 1. Tap camera icon (📷)
@@ -328,11 +693,18 @@ Mark-VII/
 1. Ask Claude 3.5 Sonnet a question
 2. See streaming response with animated cursor
 3. See response with "Mark VII x Anthropic" brand header
-4. Switch to GPT-4 Turbo
+4. Switch to GPT-4 Turbo from the model dropdown
 5. Ask the same question
 6. See response with "Mark VII x Openai"
 7. Compare the different approaches!
 8. Use retry button to re-run prompts with different models
+
+### Exporting Conversations
+1. Tap the three-dot menu (⋮) in the top right
+2. Select "Export as PDF" to save
+3. Or select "Share PDF" to send via email/messaging
+4. PDFs include proper formatting, syntax highlighting, and page margins
+5. Great for archiving important conversations or sharing insights
 
 ---
 
@@ -393,15 +765,28 @@ We welcome contributions! Here's how:
 firebase-bom:33.7.0
 firebase-firestore-ktx
 firebase-analytics-ktx
+firebase-auth-ktx
+
+// Google Sign-In
+play-services-auth:21.3.0
 
 // Networking
 retrofit:2.9.0
 okhttp:4.12.0
 gson:2.10.1
 
+// PDF Generation
+itext7-core:7.2.5
+html2pdf:4.0.5
+
+// Markdown Rendering
+compose-markdown:0.5.4
+
 // UI
 androidx.compose:*
 androidx.material3:*
+lottie-compose:6.0.0
+coil-compose:2.4.0
 ```
 
 ### Python Tools
@@ -417,7 +802,15 @@ pip install firebase-admin
 - API keys stored in Firebase (not in code)
 - `google-services.json` excluded from Git
 - HTTPS encryption for all API calls
-- No user data stored without consent
+- Google Sign-In for secure authentication
+- Chat history stored locally and synced with Firebase
+- No user data shared with third parties
+
+### User Control
+- Sign out anytime from Settings
+- Delete chat sessions individually
+- Theme preferences stored locally
+- Optional Google account sync for chat history
 
 
 ---
