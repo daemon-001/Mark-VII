@@ -25,6 +25,10 @@ object ChatData {
     var openrouter_api_key: String = ""
 
     var selected_model = ""
+    
+    // Cache for free models so we do not re-fetch on view recreation
+    var cachedFreeModels: List<ModelInfo> = emptyList()
+    var cachedFreeModelsKey: String = ""
 
     /**
      * Update API key from Firebase
@@ -116,6 +120,20 @@ object ChatData {
         } catch (e: Exception) {
             emptyList()
         }
+    }
+
+    /**
+     * Get cached free models, or fetch them if not already loaded
+     */
+    suspend fun getOrFetchFreeModels(cacheKey: String? = null): List<ModelInfo> {
+        if (cachedFreeModels.isNotEmpty() && cacheKey != null && cacheKey == cachedFreeModelsKey) {
+            return cachedFreeModels
+        }
+
+        val models = fetchFreeModels()
+        cachedFreeModels = models
+        cachedFreeModelsKey = cacheKey ?: ""
+        return models
     }
     
     /**

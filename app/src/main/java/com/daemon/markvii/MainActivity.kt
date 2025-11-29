@@ -26,8 +26,20 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.with
+import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -154,6 +166,8 @@ import androidx.compose.material.icons.rounded.Share
 
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.luminance
 
 class MainActivity : AppCompatActivity() {
 
@@ -229,12 +243,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
-        // Set window background to black to prevent white flash when keyboard appears
-        window.decorView.setBackgroundColor(android.graphics.Color.BLACK)
-        
-        // Set status bar color to match top bar gradient
-        window.statusBarColor = android.graphics.Color.parseColor("#1A1A2E")
-        
         setContent {
             // Observe theme changes
             val currentTheme by com.daemon.markvii.data.ThemePreferences.currentTheme.collectAsState()
@@ -242,6 +250,16 @@ class MainActivity : AppCompatActivity() {
                 com.daemon.markvii.data.AppTheme.LIGHT -> false
                 com.daemon.markvii.data.AppTheme.DARK -> true
                 com.daemon.markvii.data.AppTheme.SYSTEM_DEFAULT -> isSystemInDarkTheme()
+            }
+            
+            // Set window colors based on theme
+            val backgroundColor = if (darkTheme) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+            val statusBarColor = if (darkTheme) android.graphics.Color.parseColor("#1A1A2E") else android.graphics.Color.parseColor("#F5F5F5")
+            
+            SideEffect {
+                window.decorView.setBackgroundColor(backgroundColor)
+                window.statusBarColor = statusBarColor
+                window.navigationBarColor = backgroundColor
             }
 
             MarkVIITheme(darkTheme = darkTheme) {
@@ -367,7 +385,7 @@ class MainActivity : AppCompatActivity() {
                                                 text = "MARK",
                                                 fontSize = 24.sp,
                                                 fontFamily = FontFamily(Font(R.font.typographica)),
-                                                color = Color.White,
+                                                color = MaterialTheme.colorScheme.onSurface,
                                                 letterSpacing = 1.sp
                                             )
                                             Spacer(modifier = Modifier.width(6.dp))
@@ -375,7 +393,7 @@ class MainActivity : AppCompatActivity() {
                                                 text = "VII",
                                                 fontSize = 24.sp,
                                                 fontFamily = FontFamily(Font(R.font.typographica)),
-                                                color = Color(0xFF00D9FF),
+                                                color = appColors.accent,
                                                 letterSpacing = 1.sp
                                             )
                                         }
@@ -447,13 +465,13 @@ class MainActivity : AppCompatActivity() {
                                     ) {
                                         androidx.compose.material3.CircularProgressIndicator(
                                             modifier = Modifier.size(56.dp),
-                                            color = Color(0xFF00D9FF),
+                                            color = appColors.accent,
                                             strokeWidth = 5.dp
                                         )
                                         Text(
                                             text = "Signing in with Google...",
                                             fontSize = 18.sp,
-                                            color = Color.White,
+                                            color = MaterialTheme.colorScheme.onSurface,
                                             fontWeight = FontWeight.Medium
                                         )
                                     }
@@ -463,7 +481,7 @@ class MainActivity : AppCompatActivity() {
                             } // Box
 
                         }
-                        composable("info_screen",){
+                        composable("info_screen") {
                             InfoSetting() // starting infoTab ui (About section)
                         }
 
@@ -492,13 +510,14 @@ class MainActivity : AppCompatActivity() {
         onDismiss: () -> Unit,
         onRetry: (() -> Unit)? = null
     ) {
+        val appColors = LocalAppColors.current
         var showDetails by remember { mutableStateOf(false) }
 
         AlertDialog(
             onDismissRequest = onDismiss,
-            containerColor = Color(0xFF2C2C2E),
-            titleContentColor = Color(0xFFE5E5E5),
-            textContentColor = Color(0xFFE5E5E5),
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurface,
             shape = RoundedCornerShape(20.dp),
             title = { 
                 Column(
@@ -524,7 +543,7 @@ class MainActivity : AppCompatActivity() {
                     Text(
                         text = errorMessage,
                         fontSize = 14.sp,
-                        color = Color(0xFFE5E5E5),
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(start = 32.dp)
                     )
                 }
@@ -538,10 +557,10 @@ class MainActivity : AppCompatActivity() {
                                 .fillMaxWidth()
                                 .heightIn(max = 300.dp)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFF1C1C1E))
+                                .background(appColors.surfaceTertiary)
                                 .border(
                                     width = 1.dp,
-                                    color = Color(0xFF3A3A3C),
+                                    color = appColors.divider,
                                     shape = RoundedCornerShape(12.dp)
                                 )
                         ) {
@@ -551,7 +570,7 @@ class MainActivity : AppCompatActivity() {
                                     text = errorDetails,
                                     style = MaterialTheme.typography.bodySmall,
                                     fontSize = 13.sp,
-                                    color = Color(0xFFAAAAAA),
+                                    color = appColors.textSecondary,
                                     lineHeight = 18.sp,
                                     modifier = Modifier
                                         .verticalScroll(scrollState)
@@ -571,7 +590,7 @@ class MainActivity : AppCompatActivity() {
                         onDismiss()
                     },
                     colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                        contentColor = if (isRetryable) Color(0xFF00D9FF) else Color(0xFFE5E5E5)
+                        contentColor = if (isRetryable) appColors.accent else MaterialTheme.colorScheme.onSurface
                     )
                 ) {
                     Text(
@@ -598,7 +617,7 @@ class MainActivity : AppCompatActivity() {
     }
 
 //    chat home screen ui starts here
-    @OptIn(ExperimentalMaterial3Api::class)
+    @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
     @Composable
     fun ChatScreen(paddingValues: PaddingValues) {
         val chaViewModel = viewModel<ChatViewModel>()
@@ -623,8 +642,8 @@ class MainActivity : AppCompatActivity() {
         }
         
         // State for loading free models from OpenRouter and Gemini
-        var isLoadingModels by remember { mutableStateOf(false) }
-        var freeModels by remember { mutableStateOf<List<ModelInfo>>(emptyList()) }
+        var isLoadingModels by remember { mutableStateOf(ChatData.cachedFreeModels.isEmpty()) }
+        var freeModels by remember { mutableStateOf<List<ModelInfo>>(ChatData.cachedFreeModels) }
         var modelsLoadError by remember { mutableStateOf<String?>(null) }
         val appColors = LocalAppColors.current // Get theme colors for outer scope
         
@@ -668,16 +687,28 @@ class MainActivity : AppCompatActivity() {
         
         LaunchedEffect(firebaseApiKey, exceptionModels) {
             if (firebaseApiKey.isNotEmpty()) {
-                isLoadingModels = true
-                try {
-                    freeModels = ChatData.fetchFreeModels()
-                    if (freeModels.isEmpty()) {
-                        modelsLoadError = "No free models available"
-                    }
-                } catch (e: Exception) {
-                    modelsLoadError = "Failed to load models: ${e.message}"
-                } finally {
+                // Build a cache key that changes when either API key or exception models change
+                val modelsCacheKey = "$firebaseApiKey|${exceptionModels.hashCode()}"
+
+                // If we already have cached models with the same cache key, reuse them
+                if (ChatData.cachedFreeModels.isNotEmpty() && ChatData.cachedFreeModelsKey == modelsCacheKey) {
+                    // Models already cached, use them directly without showing loading
+                    freeModels = ChatData.cachedFreeModels
                     isLoadingModels = false
+                } else {
+                    // Only show loading if we need to fetch new models
+                    isLoadingModels = true
+                    try {
+                        // Use the convenience method which caches the result in ChatData
+                        freeModels = ChatData.getOrFetchFreeModels(modelsCacheKey)
+                        if (freeModels.isEmpty()) {
+                            modelsLoadError = "No free models available"
+                        }
+                    } catch (e: Exception) {
+                        modelsLoadError = "Failed to load models: ${e.message}"
+                    } finally {
+                        isLoadingModels = false
+                    }
                 }
             }
         }
@@ -805,7 +836,7 @@ class MainActivity : AppCompatActivity() {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(top = paddingValues.calculateTopPadding())) {
 //            Chat messages list - extends to bottom of screen
             Box(
@@ -902,7 +933,7 @@ class MainActivity : AppCompatActivity() {
                             Brush.verticalGradient(
                                 colors = listOf(
                                     Color.Transparent,
-                                    Color.Black
+                                    MaterialTheme.colorScheme.background
                                 )
                             )
                         )
@@ -977,23 +1008,31 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-// ================ Dark Minimalist Input Box (Gemini Style) ================
+// ================ Enhanced Visible Input Box ================
                 Column {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .shadow(
-                                elevation = 8.dp,
-                                shape = RoundedCornerShape(20.dp),
-                                ambientColor = Color.Black.copy(alpha = 0.4f),
-                                spotColor = Color.Black.copy(alpha = 0.4f)
+                                elevation = 16.dp,
+                                shape = RoundedCornerShape(24.dp),
+                                ambientColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                                spotColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                             )
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(appColors.surfaceVariant)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(
+                                if (appColors.textPrimary.luminance() > 0.5f) {
+                                    // Dark theme - darker background for contrast
+                                    appColors.surfaceTertiary
+                                } else {
+                                    // Light theme - use surface with slight tint
+                                    MaterialTheme.colorScheme.surface
+                                }
+                            )
                             .border(
-                                width = 1.dp,
-                                color = appColors.divider,
-                                shape = RoundedCornerShape(20.dp)
+                                width = 1.5.dp,
+                                color = appColors.divider.copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(24.dp)
                             )
                     ) {
                         Column {
@@ -1057,7 +1096,7 @@ class MainActivity : AppCompatActivity() {
                                             .clickable(
                                                 interactionSource = remember { MutableInteractionSource() },
                                                 indication = ripple(
-                                                    color = Color.White.copy(alpha = 0.3f)
+                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                                                 )
                                             ) { 
                                                 isPromptDropDownExpanded.value = true 
@@ -1088,10 +1127,24 @@ class MainActivity : AppCompatActivity() {
                                         )
                                     }
                                     
-                                    // Dropdown menu - Aesthetic design
+                                    // Dropdown menu - Aesthetic design with animation
+                                    val dropdownScale by androidx.compose.animation.core.animateFloatAsState(
+                                        targetValue = if (isPromptDropDownExpanded.value) 1f else 0.95f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessMedium
+                                        ),
+                                        label = "dropdown_scale"
+                                    )
+                                    
                                     Box(
                                         modifier = Modifier
                                             .width(280.dp)
+                                            .graphicsLayer {
+                                                scaleX = dropdownScale
+                                                scaleY = dropdownScale
+                                                alpha = if (isPromptDropDownExpanded.value) 1f else 0f
+                                            }
                                             .shadow(
                                                 elevation = 12.dp,
                                                 shape = RoundedCornerShape(20.dp),
@@ -1207,11 +1260,12 @@ class MainActivity : AppCompatActivity() {
                                             }
                                             
                                         if (currentModels.isEmpty()) {
-                                            Box(
+                                            Column(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .padding(vertical = 16.dp),
-                                                contentAlignment = Alignment.Center
+                                                    .padding(vertical = 16.dp, horizontal = 16.dp),
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.spacedBy(12.dp)
                                             ) {
                                                 Text(
                                                     text = "No models available",
@@ -1219,6 +1273,55 @@ class MainActivity : AppCompatActivity() {
                                                     fontSize = 14.sp,
                                                     style = MaterialTheme.typography.bodyMedium
                                                 )
+                                                
+                                                // Show reload button only for OpenRouter
+                                                if (currentApiProvider == ApiProvider.OPENROUTER) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .clip(RoundedCornerShape(10.dp))
+                                                            .background(appColors.accent.copy(alpha = 0.15f))
+                                                            .clickable {
+                                                                // Clear cache and reload models
+                                                                ChatData.cachedFreeModels = emptyList()
+                                                                ChatData.cachedFreeModelsKey = ""
+                                                                isLoadingModels = true
+                                                                coroutineScope.launch {
+                                                                    try {
+                                                                        val modelsCacheKey = "$firebaseApiKey|${exceptionModels.hashCode()}"
+                                                                        freeModels = ChatData.getOrFetchFreeModels(modelsCacheKey)
+                                                                        if (freeModels.isEmpty()) {
+                                                                            modelsLoadError = "No free models available"
+                                                                        } else {
+                                                                            modelsLoadError = null
+                                                                        }
+                                                                    } catch (e: Exception) {
+                                                                        modelsLoadError = "Failed to load models: ${e.message}"
+                                                                    } finally {
+                                                                        isLoadingModels = false
+                                                                    }
+                                                                }
+                                                            }
+                                                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                                                    ) {
+                                                        Row(
+                                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Rounded.Refresh,
+                                                                contentDescription = "Reload models",
+                                                                tint = appColors.accent,
+                                                                modifier = Modifier.size(18.dp)
+                                                            )
+                                                            Text(
+                                                                text = "Reload Models",
+                                                                color = appColors.accent,
+                                                                fontSize = 13.sp,
+                                                                fontWeight = FontWeight.SemiBold
+                                                            )
+                                                        }
+                                                    }
+                                                }
                                             }
                                         } else {
                                             currentModels.forEachIndexed { index, model ->
@@ -1251,9 +1354,9 @@ class MainActivity : AppCompatActivity() {
                                                                 Text(
                                                                     text = model.displayName,
                                                                     color = if (promptItemPosition.value == index) 
-                                                                        Color(0xFF00D9FF) 
+                                                                        appColors.accent 
                                                                     else 
-                                                                        Color(0xFFE5E5E5),
+                                                                        MaterialTheme.colorScheme.onSurface,
                                                                     fontSize = 15.sp,
                                                                     style = MaterialTheme.typography.bodyMedium,
                                                                     fontWeight = if (promptItemPosition.value == index) 
@@ -1281,21 +1384,21 @@ class MainActivity : AppCompatActivity() {
                                                             .clip(RoundedCornerShape(12.dp))
                                                             .background(
                                                                 if (promptItemPosition.value == index)
-                                                                    Color(0xFF00D9FF).copy(alpha = 0.1f)
+                                                                    appColors.accent.copy(alpha = 0.1f)
                                                                 else
-                                                                    Color(0xFF2C2C2E)
+                                                                    appColors.surfaceVariant
                                                             ),
                                                         contentPadding = PaddingValues(
                                                             horizontal = 12.dp,
                                                             vertical = 12.dp
                                                         ),
                                                         colors = MenuDefaults.itemColors(
-                                                            textColor = Color(0xFFE5E5E5),
-                                                            leadingIconColor = Color(0xFFE5E5E5),
-                                                            trailingIconColor = Color(0xFFE5E5E5),
-                                                            disabledTextColor = Color(0xFF8E8E93),
-                                                            disabledLeadingIconColor = Color(0xFF8E8E93),
-                                                            disabledTrailingIconColor = Color(0xFF8E8E93)
+                                                            textColor = MaterialTheme.colorScheme.onSurface,
+                                                            leadingIconColor = MaterialTheme.colorScheme.onSurface,
+                                                            trailingIconColor = MaterialTheme.colorScheme.onSurface,
+                                                            disabledTextColor = appColors.textSecondary,
+                                                            disabledLeadingIconColor = appColors.textSecondary,
+                                                            disabledTrailingIconColor = appColors.textSecondary
                                                         )
                                                     )
                                                 }
@@ -1320,7 +1423,7 @@ class MainActivity : AppCompatActivity() {
                                         Icon(
                                             imageVector = Icons.Rounded.Add,
                                             contentDescription = "Add image",
-                                            tint = Color(0xFFE5E5E5),
+                                            tint = MaterialTheme.colorScheme.onSurface,
                                             modifier = Modifier.size(22.dp)
                                         )
                                     }
@@ -1357,11 +1460,25 @@ class MainActivity : AppCompatActivity() {
                                     )
                                 }
                                 
-                                // Send/Stop button
+                                // Send/Stop button with scale animation
                                 val interactionSource = remember { MutableInteractionSource() }
+                                val isButtonEnabled = chatState.isGeneratingResponse || chatState.prompt.isNotEmpty() || bitmap != null
+                                val buttonScale by androidx.compose.animation.core.animateFloatAsState(
+                                    targetValue = if (isButtonEnabled) 1f else 0.85f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessMedium
+                                    ),
+                                    label = "button_scale"
+                                )
+                                
                                 Box(
                                     modifier = Modifier
                                         .size(36.dp)
+                                        .graphicsLayer {
+                                            scaleX = buttonScale
+                                            scaleY = buttonScale
+                                        }
                                         .clip(CircleShape)
                                         .background(
                                             if (chatState.isGeneratingResponse) {
@@ -1373,7 +1490,7 @@ class MainActivity : AppCompatActivity() {
                                             }
                                         )
                                         .clickable(
-                                            enabled = chatState.isGeneratingResponse || chatState.prompt.isNotEmpty() || bitmap != null,
+                                            enabled = isButtonEnabled,
                                             interactionSource = interactionSource,
                                             indication = null // Remove ripple effect for instant response
                                         ) {
@@ -1393,22 +1510,31 @@ class MainActivity : AppCompatActivity() {
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {
+                                    AnimatedContent(
+                                        targetState = chatState.isGeneratingResponse,
+                                        transitionSpec = {
+                                            fadeIn(animationSpec = tween(200)) with
+                                            fadeOut(animationSpec = tween(200))
+                                        },
+                                        label = "icon_animation"
+                                    ) { isGenerating ->
                                     Icon(
-                                        imageVector = if (chatState.isGeneratingResponse) {
+                                        imageVector = if (isGenerating) {
                                             Icons.Rounded.Stop
                                         } else {
                                             Icons.Rounded.ArrowUpward
                                         },
-                                        contentDescription = if (chatState.isGeneratingResponse) "Stop" else "Send",
-                                        tint = if (chatState.isGeneratingResponse) {
-                                            Color.White
+                                        contentDescription = if (isGenerating) "Stop" else "Send",
+                                        tint = if (isGenerating) {
+                                            MaterialTheme.colorScheme.onPrimary
                                         } else if (chatState.prompt.isNotEmpty() || bitmap != null) {
                                             Color(0xFF1C1C1E)
                                         } else {
-                                            Color(0xFF8E8E93)
+                                            appColors.textSecondary
                                         },
                                         modifier = Modifier.size(18.dp)
                                     )
+                                    }
                                 }
                             }
                         }
@@ -1422,6 +1548,8 @@ class MainActivity : AppCompatActivity() {
 //    user chat text bubble
     @Composable
     fun UserChatItem(prompt: String, bitmap: Bitmap?) {
+        val appColors = LocalAppColors.current
+        
         SelectionContainer() {
             Column(
                 modifier = Modifier
@@ -1449,12 +1577,12 @@ class MainActivity : AppCompatActivity() {
                     modifier = Modifier
 //                        .fillMaxWidth()
                         .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0xFF3E3E3E))
+                        .background(appColors.surfaceVariant)
                         .padding(start = 15.dp, end = 15.dp, top = 10.dp, bottom = 10.dp),
 //                    textAlign = TextAlign.Right,
                     text = prompt,
                     fontSize = 17.sp,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
 
             }
@@ -1465,16 +1593,18 @@ class MainActivity : AppCompatActivity() {
     // Syntax highlighting for code blocks
     @Composable
     fun HighlightedCodeText(code: String) {
+        val appColors = LocalAppColors.current
         val annotatedString = buildAnnotatedString {
             val text = code.trim()
             append(text)
             
-            // Define color scheme
-            val keywordColor = Color(0xFF569CD6)
-            val stringColor = Color(0xFFCE9178)
-            val commentColor = Color(0xFF6A9955)
-            val numberColor = Color(0xFFB5CEA8)
-            val functionColor = Color(0xFFDCDCAA)
+            // Define color scheme based on theme
+            val isDark = appColors.textPrimary.luminance() > 0.5f
+            val keywordColor = if (isDark) Color(0xFF569CD6) else Color(0xFF0000FF)
+            val stringColor = if (isDark) Color(0xFFCE9178) else Color(0xFFA31515)
+            val commentColor = if (isDark) Color(0xFF6A9955) else Color(0xFF008000)
+            val numberColor = if (isDark) Color(0xFFB5CEA8) else Color(0xFF098658)
+            val functionColor = if (isDark) Color(0xFFDCDCAA) else Color(0xFF795E26)
             
             // Keywords
             val keywords = listOf(
@@ -1513,7 +1643,7 @@ class MainActivity : AppCompatActivity() {
             text = annotatedString,
             style = TextStyle(
                 fontFamily = FontFamily.Monospace,
-                color = Color(0xFFE0E0E0),
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp
             ),
             softWrap = false,
@@ -1524,6 +1654,8 @@ class MainActivity : AppCompatActivity() {
     // Custom Markdown renderer with copy buttons for code blocks
     @Composable
     fun MarkdownWithCodeCopy(response: String, context: android.content.Context) {
+        val appColors = LocalAppColors.current
+        
         // Memoize parsed parts to avoid recalculation on every recomposition
         val parts = remember(response) {
             val codeBlockRegex = Regex("```(\\w+)?\\n?([\\s\\S]*?)```")
@@ -1554,7 +1686,7 @@ class MainActivity : AppCompatActivity() {
                 markdown = response,
                 modifier = Modifier.fillMaxWidth(),
                 style = TextStyle(
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 16.sp,
                     lineHeight = 22.sp
                 )
@@ -1574,14 +1706,14 @@ class MainActivity : AppCompatActivity() {
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0xFF1E1E1E))
+                                    .background(appColors.surfaceTertiary)
                                     .padding(12.dp)
                             ) {
                                 // Language label
                                 Text(
                                     text = language,
                                     style = TextStyle(
-                                        color = Color(0xFF8E8E93),
+                                        color = appColors.textSecondary,
                                         fontSize = 12.sp,
                                         fontFamily = FontFamily.Monospace
                                     ),
@@ -1615,7 +1747,7 @@ class MainActivity : AppCompatActivity() {
                                 Icon(
                                     imageVector = Icons.Rounded.ContentCopy,
                                     contentDescription = "Copy code",
-                                    tint = Color(0xFF8E8E93),
+                                    tint = appColors.textSecondary,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
@@ -1627,7 +1759,7 @@ class MainActivity : AppCompatActivity() {
                                 markdown = content,
                                 modifier = Modifier.fillMaxWidth(),
                                 style = TextStyle(
-                                    color = Color.White,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontSize = 16.sp,
                                     lineHeight = 22.sp
                                 )
@@ -1654,6 +1786,7 @@ class MainActivity : AppCompatActivity() {
         isError: Boolean = false,
         onApiSwitch: (ApiProvider) -> Unit = {}
     ) {
+        val appColors = LocalAppColors.current
         val context = LocalContext.current
         val hapticFeedback = LocalHapticFeedback.current
         var showModelSelector by remember { mutableStateOf(false) }
@@ -1759,13 +1892,13 @@ class MainActivity : AppCompatActivity() {
                         text = headerText,
                         fontSize = 18.sp,
                         fontFamily = FontFamily(Font(R.font.typographica)),
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     if (modelUsed.isNotEmpty()) {
                         Text(
                             text = modelUsed.replace(":free", ""),
                             fontSize = 12.sp,
-                            color = Color(0xFF8E8E93),
+                            color = appColors.textSecondary,
                             modifier = Modifier.padding(top = 2.dp)
                         )
                     }
@@ -1815,14 +1948,14 @@ class MainActivity : AppCompatActivity() {
                             ) {
                                 Text(
                                     text = "▋",
-                                    color = Color(0xFF569CD6),
+                                    color = appColors.accent,
                                     fontSize = 16.sp
                                 )
                             }
                             Text(
                                 text = "Generating response...",
                                 fontSize = 12.sp,
-                                color = Color(0xFF8E8E93)
+                                color = appColors.textSecondary
                             )
                         }
                     }
@@ -1835,7 +1968,7 @@ class MainActivity : AppCompatActivity() {
                             Text(
                                 text = displayedText,
                                 fontSize = 16.sp,
-                                color = Color(0xFFFF3B30), // Red color for errors
+                                color = appColors.error,
                                 fontFamily = FontFamily.Monospace
                             )
                         } else if (isStreaming) {
@@ -1843,7 +1976,7 @@ class MainActivity : AppCompatActivity() {
                             Text(
                                 text = displayedText,
                                 fontSize = 16.sp,
-                                color = Color.White,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 lineHeight = 22.sp,
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -1889,7 +2022,7 @@ class MainActivity : AppCompatActivity() {
                     Icon(
                         imageVector = Icons.Rounded.ContentCopy,
                         contentDescription = "Copy",
-                        tint = Color(0xFF8E8E93),
+                        tint = appColors.textSecondary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -1924,7 +2057,7 @@ class MainActivity : AppCompatActivity() {
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.VolumeUp,
                         contentDescription = "Speak",
-                        tint = Color(0xFF8E8E93),
+                        tint = appColors.textSecondary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -1939,7 +2072,7 @@ class MainActivity : AppCompatActivity() {
                     Icon(
                         imageVector = Icons.Rounded.Refresh,
                         contentDescription = "Retry with different model",
-                        tint = Color(0xFF8E8E93),
+                        tint = appColors.textSecondary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -1952,7 +2085,7 @@ class MainActivity : AppCompatActivity() {
                     Icon(
                         imageVector = Icons.Rounded.PictureAsPdf,
                         contentDescription = "Export PDF",
-                        tint = Color(0xFF8E8E93),
+                        tint = appColors.textSecondary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -1972,7 +2105,7 @@ class MainActivity : AppCompatActivity() {
                     Icon(
                         imageVector = Icons.Rounded.Share,
                         contentDescription = "Share",
-                        tint = Color(0xFF8E8E93),
+                        tint = appColors.textSecondary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -1983,14 +2116,14 @@ class MainActivity : AppCompatActivity() {
             if (showModelSelector) {
                 AlertDialog(
                     onDismissRequest = { showModelSelector = false },
-                    containerColor = Color(0xFF2C2C2E),
+                    containerColor = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(20.dp),
                     title = {
                         Text(
                             text = "Retry with Model",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFFE5E5E5)
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     },
                     text = {
@@ -2012,9 +2145,9 @@ class MainActivity : AppCompatActivity() {
                                         .clip(RoundedCornerShape(10.dp))
                                         .background(
                                             if (selectedApiProvider == ApiProvider.GEMINI)
-                                                Color(0xFF00D9FF).copy(alpha = 0.2f)
+                                                appColors.accent.copy(alpha = 0.2f)
                                             else
-                                                Color(0xFF3A3A3C)
+                                                appColors.surfaceVariant
                                         )
                                         .clickable {
                                             selectedApiProvider = ApiProvider.GEMINI
@@ -2026,9 +2159,9 @@ class MainActivity : AppCompatActivity() {
                                     Text(
                                         text = "Gemini",
                                         color = if (selectedApiProvider == ApiProvider.GEMINI)
-                                            Color(0xFF00D9FF)
+                                            appColors.accent
                                         else
-                                            Color(0xFF8E8E93),
+                                            appColors.textSecondary,
                                         fontSize = 13.sp,
                                         fontWeight = if (selectedApiProvider == ApiProvider.GEMINI)
                                             FontWeight.SemiBold
@@ -2046,9 +2179,9 @@ class MainActivity : AppCompatActivity() {
                                         .clip(RoundedCornerShape(10.dp))
                                         .background(
                                             if (selectedApiProvider == ApiProvider.OPENROUTER)
-                                                Color(0xFF00D9FF).copy(alpha = 0.2f)
+                                                appColors.accent.copy(alpha = 0.2f)
                                             else
-                                                Color(0xFF3A3A3C)
+                                                appColors.surfaceVariant
                                         )
                                         .clickable {
                                             if (hasImage) {
@@ -2068,9 +2201,9 @@ class MainActivity : AppCompatActivity() {
                                     Text(
                                         text = "OpenRouter",
                                         color = if (selectedApiProvider == ApiProvider.OPENROUTER)
-                                            Color(0xFF00D9FF)
+                                            appColors.accent
                                         else
-                                            Color(0xFF8E8E93),
+                                            appColors.textSecondary,
                                         fontSize = 13.sp,
                                         fontWeight = if (selectedApiProvider == ApiProvider.OPENROUTER)
                                             FontWeight.SemiBold
@@ -2087,7 +2220,7 @@ class MainActivity : AppCompatActivity() {
                                         .fillMaxWidth()
                                         .padding(bottom = 8.dp)
                                         .clip(RoundedCornerShape(8.dp))
-                                        .background(Color(0xFFFF3B30).copy(alpha = 0.1f))
+                                        .background(appColors.error.copy(alpha = 0.1f))
                                         .padding(12.dp)
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2098,7 +2231,7 @@ class MainActivity : AppCompatActivity() {
                                         )
                                         Text(
                                             text = "Images are not supported with OpenRouter",
-                                            color = Color(0xFFFF3B30),
+                                            color = appColors.error,
                                             fontSize = 13.sp
                                         )
                                     }
@@ -2111,7 +2244,7 @@ class MainActivity : AppCompatActivity() {
                                     .fillMaxWidth()
                                     .padding(vertical = 8.dp)
                                     .height(1.dp)
-                                    .background(Color(0xFF3A3A3C))
+                                    .background(appColors.divider)
                             )
                             
                             // Model List
@@ -2126,7 +2259,7 @@ class MainActivity : AppCompatActivity() {
                                     item {
                                         Text(
                                             text = "Loading models...",
-                                            color = Color(0xFF8E8E93),
+                                            color = appColors.textSecondary,
                                             modifier = Modifier.padding(16.dp)
                                         )
                                     }
@@ -2139,7 +2272,7 @@ class MainActivity : AppCompatActivity() {
                                                 .clip(RoundedCornerShape(12.dp))
                                                 .background(
                                                     if (model.apiModel == modelUsed)
-                                                        Color(0xFF00D9FF).copy(alpha = 0.1f)
+                                                        appColors.accent.copy(alpha = 0.1f)
                                                     else
                                                         Color.Transparent
                                                 )
@@ -2165,15 +2298,15 @@ class MainActivity : AppCompatActivity() {
                                                     modifier = Modifier
                                                         .size(6.dp)
                                                         .clip(CircleShape)
-                                                        .background(Color(0xFF00D9FF))
+                                                        .background(appColors.accent)
                                                 )
                                                 Spacer(modifier = Modifier.width(12.dp))
                                                 Text(
                                                     text = model.displayName,
                                                     color = if (model.apiModel == modelUsed)
-                                                        Color(0xFF00D9FF)
+                                                        appColors.accent
                                                     else
-                                                        Color(0xFFE5E5E5),
+                                                        MaterialTheme.colorScheme.onSurface,
                                                     fontSize = 15.sp,
                                                     fontWeight = if (model.apiModel == modelUsed)
                                                         FontWeight.SemiBold
@@ -2191,7 +2324,7 @@ class MainActivity : AppCompatActivity() {
                         TextButton(
                             onClick = { showModelSelector = false },
                             colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                                contentColor = Color(0xFF8E8E93)
+                                contentColor = appColors.textSecondary
                             )
                         ) {
                             Text("Cancel", fontSize = 15.sp)
@@ -2204,15 +2337,15 @@ class MainActivity : AppCompatActivity() {
             if (showExportDialog) {
                 AlertDialog(
                     onDismissRequest = { showExportDialog = false },
-                    containerColor = Color(0xFF2C2C2E),
-                    title = { Text("Export Response", color = Color.White) },
-                    text = { Text("Choose how you want to export this response as PDF.", color = Color(0xFFE5E5E5)) },
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    title = { Text("Export Response", color = MaterialTheme.colorScheme.onSurface) },
+                    text = { Text("Choose how you want to export this response as PDF.", color = appColors.textPrimary) },
                     confirmButton = {
                         TextButton(onClick = {
                             showExportDialog = false
                             PdfGenerator.exportToPdf(context, response, brandName, modelUsed, userPrompt)
                         }) {
-                            Text("Save to Device", color = Color(0xFF00D9FF))
+                            Text("Save to Device", color = appColors.accent)
                         }
                     },
                     dismissButton = {
@@ -2220,7 +2353,7 @@ class MainActivity : AppCompatActivity() {
                             showExportDialog = false
                             PdfGenerator.sharePdf(context, response, brandName, modelUsed, userPrompt)
                         }) {
-                            Text("Share PDF", color = Color(0xFF00D9FF))
+                            Text("Share PDF", color = appColors.accent)
                         }
                     }
                 )
@@ -2335,6 +2468,7 @@ class MainActivity : AppCompatActivity() {
     
     @Composable
     fun PromptSuggestionBubbles(onSuggestionClick: (String) -> Unit) {
+        val appColors = LocalAppColors.current
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -2346,7 +2480,7 @@ class MainActivity : AppCompatActivity() {
                 text = "Getting Started",
                 fontSize = 24.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(bottom = 20.dp)
             )
             
@@ -2378,7 +2512,7 @@ class MainActivity : AppCompatActivity() {
                 text = "Response Actions",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
             
@@ -2411,7 +2545,7 @@ class MainActivity : AppCompatActivity() {
                 text = "💡 Tips",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF4A90E2),
+                color = appColors.accent,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
             
@@ -2431,6 +2565,7 @@ class MainActivity : AppCompatActivity() {
         number: String,
         text: String
     ) {
+        val appColors = LocalAppColors.current
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -2441,12 +2576,12 @@ class MainActivity : AppCompatActivity() {
                 modifier = Modifier
                     .size(28.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF4A90E2)),
+                    .background(appColors.accent),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = number,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -2454,7 +2589,7 @@ class MainActivity : AppCompatActivity() {
             
             Text(
                 text = text,
-                color = Color(0xFFE5E5E5),
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 15.sp,
                 lineHeight = 22.sp,
                 modifier = Modifier.padding(top = 3.dp)
@@ -2479,7 +2614,7 @@ class MainActivity : AppCompatActivity() {
             
             Text(
                 text = text,
-                color = Color(0xFFE5E5E5),
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp,
                 lineHeight = 20.sp
             )
@@ -2488,6 +2623,7 @@ class MainActivity : AppCompatActivity() {
     
     @Composable
     fun TipItem(text: String) {
+        val appColors = LocalAppColors.current
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -2495,13 +2631,13 @@ class MainActivity : AppCompatActivity() {
         ) {
             Text(
                 text = "•",
-                color = Color(0xFF8E8E93),
+                color = appColors.textSecondary,
                 fontSize = 14.sp
             )
             
             Text(
                 text = text,
-                color = Color(0xFF8E8E93),
+                color = appColors.textSecondary,
                 fontSize = 14.sp,
                 lineHeight = 20.sp
             )

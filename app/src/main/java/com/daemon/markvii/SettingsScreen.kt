@@ -36,7 +36,7 @@ fun SettingsScreen(
                 title = {
                     Text(
                         text = "Settings",
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.SemiBold
                     )

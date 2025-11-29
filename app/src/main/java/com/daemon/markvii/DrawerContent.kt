@@ -119,6 +119,8 @@ fun DrawerContent(
 fun UnauthenticatedDrawerContent(
     onSignIn: () -> Unit
 ) {
+    val appColors = LocalAppColors.current
+    
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -134,21 +136,21 @@ fun UnauthenticatedDrawerContent(
                     text = "Guest",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = "Not signed in",
                     fontSize = 12.sp,
-                    color = Color(0xFF8E8E93),
+                    color = appColors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
         }
         
-        Divider(color = Color(0xFF3A3A3C), thickness = 1.dp)
+        Divider(color = appColors.divider, thickness = 1.dp)
         
         Spacer(modifier = Modifier.height(12.dp))
         
@@ -157,7 +159,7 @@ fun UnauthenticatedDrawerContent(
             text = "Recent Chats",
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
-            color = Color(0xFF8E8E93),
+            color = appColors.textSecondary,
             modifier = Modifier.padding(horizontal = 20.dp)
         )
         
@@ -174,7 +176,7 @@ fun UnauthenticatedDrawerContent(
             Text(
                 text = "Sign in to save your chat history",
                 fontSize = 14.sp,
-                color = Color(0xFF8E8E93),
+                color = appColors.textSecondary,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
             
@@ -183,10 +185,10 @@ fun UnauthenticatedDrawerContent(
             OutlinedButton(
                 onClick = onSignIn,
                 colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = Color.White,
-                    contentColor = Color.Black
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.onSurface
                 ),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFDDDDDD)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, appColors.divider),
                 shape = RoundedCornerShape(24.dp),
                 modifier = Modifier
                     .height(44.dp)
@@ -253,38 +255,38 @@ fun AuthenticatedDrawerContent(
                         .border(width = 2.dp, color = appColors.accent, shape = CircleShape)
                 )
             
-            Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(12.dp))
             
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = user.displayName ?: "User",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = user.email ?: "",
-                    fontSize = 12.sp,
-                    color = appColors.textSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = user.displayName ?: "User",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = user.email ?: "",
+                        fontSize = 12.sp,
+                        color = appColors.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             
-            // Settings button
-            IconButton(onClick = onSettingsClick) {
-                Icon(
-                    imageVector = Icons.Rounded.Settings,
-                    contentDescription = "Settings",
-                    tint = appColors.textSecondary
-                )
+                // Settings button
+                IconButton(onClick = onSettingsClick) {
+                    Icon(
+                        imageVector = Icons.Rounded.Settings,
+                        contentDescription = "Settings",
+                        tint = appColors.textSecondary
+                    )
+                }
             }
         }
         
-        Divider(color = Color(0xFF3A3A3C), thickness = 1.dp)
+        Divider(color = appColors.divider, thickness = 1.dp)
         
         Spacer(modifier = Modifier.height(12.dp))
         
@@ -417,7 +419,7 @@ fun ChatSessionItem(
             modifier = Modifier.background(MaterialTheme.colorScheme.surface)
         ) {
             DropdownMenuItem(
-                text = { Text("Rename", color = Color.White) },
+                text = { Text("Rename", color = MaterialTheme.colorScheme.onSurface) },
                 onClick = {
                     showMenu = false
                     showRenameDialog = true
@@ -426,7 +428,7 @@ fun ChatSessionItem(
                     Icon(
                         androidx.compose.material.icons.Icons.Rounded.Edit,
                         contentDescription = null,
-                        tint = Color.White
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
             )
@@ -460,11 +462,11 @@ fun ChatSessionItem(
                     onValueChange = { newTitle = it },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                         cursorColor = appColors.accent,
                         focusedBorderColor = appColors.accent,
-                        unfocusedBorderColor = Color(0xFF3A3A3C)
+                        unfocusedBorderColor = appColors.divider
                     )
                 )
             },
@@ -477,17 +479,17 @@ fun ChatSessionItem(
                         }
                     }
                 ) {
-                    Text("Save", color = Color(0xFF00D9FF))
+                    Text("Save", color = appColors.accent)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showRenameDialog = false }) {
-                    Text("Cancel", color = Color.White)
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurface)
                 }
             },
-            containerColor = Color(0xFF1C1C1E),
-            titleContentColor = Color.White,
-            textContentColor = Color(0xFFE5E5E5)
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = appColors.textPrimary
         )
     }
     
@@ -504,7 +506,7 @@ fun ChatSessionItem(
                         showDeleteDialog = false
                     },
                     colors = ButtonDefaults.textButtonColors(
-                        contentColor = Color(0xFFFF3B30)
+                        contentColor = appColors.error
                     )
                 ) {
                     Text("Delete")
@@ -512,12 +514,12 @@ fun ChatSessionItem(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Cancel", color = Color.White)
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurface)
                 }
             },
-            containerColor = Color(0xFF1C1C1E),
-            titleContentColor = Color.White,
-            textContentColor = Color(0xFFE5E5E5)
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = appColors.textPrimary
         )
     }
 }
