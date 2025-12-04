@@ -1528,7 +1528,7 @@ class MainActivity : AppCompatActivity() {
                                             .fillMaxWidth()
                                             .height(40.dp)
                                             .clip(RoundedCornerShape(12.dp))
-                                            .background(appColors.surfaceTertiary)
+                                            .background(Color.Transparent)
                                             .padding(horizontal = 4.dp, vertical = 6.dp)
                                     ) {
                                         // Center line
