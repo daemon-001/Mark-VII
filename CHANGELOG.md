@@ -9,12 +9,29 @@ All notable changes to the Mark VII project are documented in this file.
 ---
 
 
+## December 5, 2025 04:22:40 +0530
+
+### Custom Speech Recognition with Moving Waveform Timeline
+- Implemented custom SpeechRecognizer to eliminate system toast notifications
+- Added real-time moving waveform visualization (60 bars) that scrolls right-to-left during voice input
+- Added dynamic text-to-speech speakericon at below of the response
+- Waveform replaces model selector and plus icon with smooth scale transitions (200ms enter, 150ms exit)
+- Mic icon displays circular background highlight when listening
+- Constant timeline speed (30ms intervals) for smooth, consistent waveform movement
+- Voice pitch detection using RMS dB values for real-time amplitude visualization
+- Waveform bars with curved edges (2dp radius) and fade effect for older bars
+- Center line reference and red position indicator for professional audio editor aesthetic
+- Comprehensive error handling for microphone permissions and recognition failures
+- Proper resource cleanup to prevent memory leaks
+
+---
+
+
 ## November 29, 2025 05:15:00 +0530
 
 ### UI/UX Improvements & Animations
 - Fixed InfoTab card vertical alignment and app version positioning
 - Added clickable GitHub repository link in About section
-- Implemented reload button for OpenRouter models when unavailable
 - Enhanced app-wide animations: smooth navigation transitions, staggered card entrance effects, dynamic button scaling, and optimized 60fps performance
 - Fixed model reload issue when navigating between screens
 

@@ -25,7 +25,8 @@ import com.daemon.markvii.ui.theme.LocalAppColors
 fun SettingsScreen(
     onBackClick: () -> Unit,
     onSignOut: () -> Unit,
-    onThemeChanged: (AppTheme) -> Unit = {}
+    onThemeChanged: (AppTheme) -> Unit = {},
+    isUserAuthenticated: Boolean = false
 ) {
     var selectedTheme by remember { mutableStateOf(ThemePreferences.getTheme()) }
     var showThemeMenu by remember { mutableStateOf(false) }
@@ -153,45 +154,47 @@ fun SettingsScreen(
                 }
             }
             
-            // Account Section
-            Text(
-                text = "Account",
-                fontSize = 14.sp,
-                color = appColors.textSecondary,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
-            )
-            
-            // Logout Button
-            Button(
-                onClick = onSignOut,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = appColors.surfaceVariant,
-                    contentColor = appColors.error
-                ),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Start,
-                    verticalAlignment = Alignment.CenterVertically
+            // Account Section - Only show for authenticated users
+            if (isUserAuthenticated) {
+                Text(
+                    text = "Account",
+                    fontSize = 14.sp,
+                    color = appColors.textSecondary,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+                )
+                
+                // Logout Button
+                Button(
+                    onClick = onSignOut,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = appColors.surfaceVariant,
+                        contentColor = appColors.error
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.ExitToApp,
-                        contentDescription = "Logout",
-                        tint = appColors.error,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "Logout",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Start,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ExitToApp,
+                            contentDescription = "Logout",
+                            tint = appColors.error,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Logout",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }

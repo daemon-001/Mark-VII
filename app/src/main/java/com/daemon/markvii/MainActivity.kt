@@ -11,7 +11,13 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.speech.RecognizerIntent
+import android.speech.RecognitionListener
+import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import android.util.Log
 import android.widget.Toast
 import com.google.mlkit.nl.languageid.LanguageIdentification
@@ -71,6 +77,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Close
@@ -165,6 +172,7 @@ import androidx.compose.material.icons.rounded.Share
 
 
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.luminance
@@ -177,6 +185,13 @@ class MainActivity : AppCompatActivity() {
     
     private var textToSpeech: TextToSpeech? = null
     private var isTtsInitialized = false
+    private val isTtsSpeakingState = MutableStateFlow(false)
+    
+    // Custom SpeechRecognizer
+    private var speechRecognizer: SpeechRecognizer? = null
+    private val isListeningState = MutableStateFlow(false)
+    private val voicePitchState = MutableStateFlow(0f) // RMS dB value for pitch animation
+    private val RECORD_AUDIO_PERMISSION_CODE = 101
 
     private val imagePicker =
         registerForActivityResult<PickVisualMediaRequest, Uri?>(
@@ -184,19 +199,6 @@ class MainActivity : AppCompatActivity() {
         ) { uri ->
             uri?.let {
                 uriState.update { uri.toString() }
-            }
-        }
-
-    private val voiceInputLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == RESULT_OK) {
-            val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-            spokenText?.let {
-                if (it.isNotEmpty()) {
-                    voiceInputState.update { _ -> it[0] }
-                }
-            }
             }
         }
     
@@ -240,6 +242,92 @@ class MainActivity : AppCompatActivity() {
             if (status == TextToSpeech.SUCCESS) {
                 isTtsInitialized = true
                 // Language will be set dynamically based on detected content
+                
+                // Add listener to track speaking state
+                textToSpeech?.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {
+                        isTtsSpeakingState.update { true }
+                    }
+                    
+                    override fun onDone(utteranceId: String?) {
+                        isTtsSpeakingState.update { false }
+                    }
+                    
+                    override fun onError(utteranceId: String?) {
+                        isTtsSpeakingState.update { false }
+                    }
+                })
+            }
+        }
+        
+        // Initialize SpeechRecognizer
+        if (SpeechRecognizer.isRecognitionAvailable(this)) {
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
+                setRecognitionListener(object : RecognitionListener {
+                    override fun onReadyForSpeech(params: Bundle?) {
+                        isListeningState.update { true }
+                    }
+                    
+                    override fun onBeginningOfSpeech() {
+                        // User started speaking
+                    }
+                    
+                    override fun onRmsChanged(rmsdB: Float) {
+                        // Update pitch state for animation (normalize to 0-1 range)
+                        // Typical range is -2 to 10 dB, normalize to 0-1
+                        val normalized = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
+                        voicePitchState.update { normalized }
+                    }
+                    
+                    override fun onBufferReceived(buffer: ByteArray?) {}
+                    
+                    override fun onEndOfSpeech() {
+                        isListeningState.update { false }
+                        voicePitchState.update { 0f }
+                    }
+                    
+                    override fun onError(error: Int) {
+                        isListeningState.update { false }
+                        voicePitchState.update { 0f }
+                        
+                        val errorMessage = when (error) {
+                            SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
+                            SpeechRecognizer.ERROR_CLIENT -> "Client error"
+                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission required"
+                            SpeechRecognizer.ERROR_NETWORK -> "Network error"
+                            SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
+                            SpeechRecognizer.ERROR_NO_MATCH -> "No speech detected"
+                            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognition service busy"
+                            SpeechRecognizer.ERROR_SERVER -> "Server error"
+                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech input"
+                            else -> "Recognition error"
+                        }
+                        
+                        // Only show error toast for non-timeout errors
+                        if (error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT && 
+                            error != SpeechRecognizer.ERROR_NO_MATCH) {
+                            runOnUiThread {
+                                Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                    
+                    override fun onResults(results: Bundle?) {
+                        isListeningState.update { false }
+                        voicePitchState.update { 0f }
+                        
+                        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        if (!matches.isNullOrEmpty()) {
+                            voiceInputState.update { matches[0] }
+                        }
+                    }
+                    
+                    override fun onPartialResults(partialResults: Bundle?) {
+                        // Optional: show partial results in real-time
+                    }
+                    
+                    override fun onEvent(eventType: Int, params: Bundle?) {}
+                })
             }
         }
         
@@ -446,7 +534,8 @@ class MainActivity : AppCompatActivity() {
                                         chaViewModel.onEvent(ChatUiEvent.SignOut)
                                         showSettings = false
                                     },
-                                    onThemeChanged = { /* Theme change is handled via StateFlow */ }
+                                    onThemeChanged = { /* Theme change is handled via StateFlow */ },
+                                    isUserAuthenticated = chatState.currentUser != null
                                 )
                             }
                             
@@ -498,6 +587,13 @@ class MainActivity : AppCompatActivity() {
         // Shutdown TextToSpeech to free resources
         textToSpeech?.stop()
         textToSpeech?.shutdown()
+        isTtsSpeakingState.update { false }
+        
+        // Cleanup SpeechRecognizer
+        speechRecognizer?.destroy()
+        isListeningState.update { false }
+        voicePitchState.update { 0f }
+        
         super.onDestroy()
     }
 
@@ -859,6 +955,21 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 
+                // Pre-compute previous user chat map for performance
+                val previousUserChatMap = remember(chatState.chatList) {
+                    chatState.chatList.mapIndexedNotNull { index, chat ->
+                        if (!chat.isFromUser) {
+                            index to chatState.chatList
+                                .drop(index + 1)
+                                .firstOrNull { it.isFromUser }
+                        } else null
+                    }.toMap()
+                }
+                
+                // Memoize model lists to prevent unnecessary recompositions
+                val stableFreeModels = remember(freeModels) { freeModels }
+                val stableGeminiModels = remember(geminiModels) { geminiModels }
+                
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
@@ -869,56 +980,41 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     itemsIndexed(
                         items = chatState.chatList,
-                        key = { _, chat -> chat.id }
+                        key = { _, chat -> chat.id },
+                        contentType = { _, chat -> if (chat.isFromUser) "user" else "model" }
                     ) { index, chat ->
-                        // Animate chat items with fade + slide
-                        androidx.compose.animation.AnimatedVisibility(
-                            visible = true,
-                            enter = androidx.compose.animation.fadeIn(
-                                animationSpec = androidx.compose.animation.core.tween(300)
-                            ) + androidx.compose.animation.slideInVertically(
-                                initialOffsetY = { it / 4 },
-                                animationSpec = androidx.compose.animation.core.tween(
-                                    durationMillis = 300,
-                                    easing = androidx.compose.animation.core.FastOutSlowInEasing
-                                )
+                        if (chat.isFromUser) {
+                            UserChatItem(
+                                prompt = chat.prompt, bitmap = chat.bitmap
                             )
-                        ) {
-                            if (chat.isFromUser) {
-                                UserChatItem(
-                                    prompt = chat.prompt, bitmap = chat.bitmap
-                                )
-                            } else {
-                                // Get the nearest previous user message for retry (skip error/model entries)
-                                val previousUserChat = chatState.chatList
-                                    .drop(index + 1)
-                                    .firstOrNull { it.isFromUser }
-                                
-                                ModelChatItem(
-                                    response = chat.prompt,
-                                    userPrompt = previousUserChat?.prompt ?: "",
-                                    modelUsed = chat.modelUsed,
-                                    isStreaming = chat.isStreaming,
-                                    isError = chat.isError,
-                                    freeModels = freeModels,
-                                    geminiModels = geminiModels,
-                                    currentApiProvider = currentApiProvider,
-                                    hasImage = previousUserChat?.bitmap != null,
-                                    onRetry = { _ ->
-                                        chaViewModel.onEvent(
-                                            ChatUiEvent.RetryPrompt(
-                                                previousUserChat?.prompt ?: "",
-                                                previousUserChat?.bitmap
-                                            )
+                        } else {
+                            // Use pre-computed previous user chat from map
+                            val previousUserChat = previousUserChatMap[index]
+                            
+                            ModelChatItem(
+                                response = chat.prompt,
+                                userPrompt = previousUserChat?.prompt ?: "",
+                                modelUsed = chat.modelUsed,
+                                isStreaming = chat.isStreaming,
+                                isError = chat.isError,
+                                freeModels = stableFreeModels,
+                                geminiModels = stableGeminiModels,
+                                currentApiProvider = currentApiProvider,
+                                hasImage = previousUserChat?.bitmap != null,
+                                onRetry = { _ ->
+                                    chaViewModel.onEvent(
+                                        ChatUiEvent.RetryPrompt(
+                                            previousUserChat?.prompt ?: "",
+                                            previousUserChat?.bitmap
                                         )
-                                    },
-                                    onApiSwitch = { provider ->
-                                        chaViewModel.onEvent(
-                                            ChatUiEvent.SwitchApiProvider(provider)
-                                        )
-                                    }
-                                )
-                            }
+                                    )
+                                },
+                                onApiSwitch = { provider ->
+                                    chaViewModel.onEvent(
+                                        ChatUiEvent.SwitchApiProvider(provider)
+                                    )
+                                }
+                            )
                         }
                     }
                 }
@@ -1085,9 +1181,21 @@ class MainActivity : AppCompatActivity() {
                             ) {
 
                                 
-                                // Model selector (clickable text with dropdown icon)
-                                Box(
+                                // Model selector or Pitch Waveform
+                                val isListening by isListeningState.collectAsState()
+                                val voicePitch by voicePitchState.collectAsState()
+                                
+                                // Animated transition between model selector and pitch graph
+                                AnimatedVisibility(
+                                    visible = !isListening,
+                                    enter = fadeIn(animationSpec = tween(200, easing = FastOutSlowInEasing)) + 
+                                            scaleIn(initialScale = 0.9f, animationSpec = tween(200, easing = FastOutSlowInEasing)),
+                                    exit = fadeOut(animationSpec = tween(150, easing = FastOutSlowInEasing)) + 
+                                           scaleOut(targetScale = 0.9f, animationSpec = tween(150, easing = FastOutSlowInEasing)),
                                     modifier = Modifier.weight(1f)
+                                ) {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(
                                         modifier = Modifier
@@ -1336,21 +1444,6 @@ class MainActivity : AppCompatActivity() {
                                                                 modifier = Modifier.fillMaxWidth(),
                                                                 verticalAlignment = Alignment.CenterVertically
                                                             ) {
-                                                                // Model indicator dot
-                                                                Box(
-                                                                    modifier = Modifier
-                                                                        .size(6.dp)
-                                                                        .clip(CircleShape)
-                                                                        .background(
-                                                                            if (model.isAvailable) 
-                                                                                appColors.accent 
-                                                                            else 
-                                                                                appColors.textSecondary
-                                                                        )
-                                                                )
-                                                                
-                                                                Spacer(modifier = Modifier.width(12.dp))
-                                                                
                                                                 Text(
                                                                     text = model.displayName,
                                                                     color = if (promptItemPosition.value == index) 
@@ -1407,9 +1500,79 @@ class MainActivity : AppCompatActivity() {
                                         }
                                     }
                                 }
+                                }
                                 
-                                // Image picker icon - only visible when Gemini is selected (LEFT of mic)
-                                if (currentApiProvider == ApiProvider.GEMINI) {
+                                // Pitch Waveform - visible when listening
+                                AnimatedVisibility(
+                                    visible = isListening,
+                                    enter = fadeIn(animationSpec = tween(200, easing = FastOutSlowInEasing)) + 
+                                            scaleIn(initialScale = 0.9f, animationSpec = tween(200, easing = FastOutSlowInEasing)),
+                                    exit = fadeOut(animationSpec = tween(150, easing = FastOutSlowInEasing)) + 
+                                           scaleOut(targetScale = 0.9f, animationSpec = tween(150, easing = FastOutSlowInEasing)),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    // Moving waveform timeline (like audio recorders)
+                                    var waveformData by remember { mutableStateOf(List(60) { 0.2f }) }
+                                    
+                                    // Update waveform data at constant speed
+                                    LaunchedEffect(Unit) {
+                                        while (isListening) {
+                                            // Add new pitch value at the end and remove first
+                                            waveformData = waveformData.drop(1) + voicePitch.coerceIn(0.15f, 1f)
+                                            delay(30) // Constant 30ms interval for smooth, consistent movement
+                                        }
+                                    }
+                                    
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(40.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(appColors.surfaceTertiary)
+                                            .padding(horizontal = 4.dp, vertical = 6.dp)
+                                    ) {
+                                        // Center line
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(1.dp)
+                                                .align(Alignment.Center)
+                                                .background(appColors.divider.copy(alpha = 0.3f))
+                                        )
+                                        
+                                        // Waveform bars moving from right to left
+                                        Row(
+                                            modifier = Modifier.fillMaxSize(),
+                                            horizontalArrangement = Arrangement.spacedBy(1.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            waveformData.forEachIndexed { index, amplitude ->
+                                                // Fade out older bars (left side)
+                                                val alpha = (index.toFloat() / waveformData.size).coerceIn(0.3f, 1f)
+                                                
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .fillMaxHeight(amplitude)
+                                                        .clip(RoundedCornerShape(2.dp))
+                                                        .background(appColors.textPrimary.copy(alpha = alpha))
+                                                )
+                                            }
+                                        }
+                                        
+                                        // Current position indicator (red line on the right)
+                                        Box(
+                                            modifier = Modifier
+                                                .width(2.dp)
+                                                .fillMaxHeight()
+                                                .align(Alignment.CenterEnd)
+                                                .background(appColors.error.copy(alpha = 0.8f))
+                                        )
+                                    }
+                                }
+                                
+                                // Image picker icon - only visible when Gemini is selected and NOT listening
+                                if (currentApiProvider == ApiProvider.GEMINI && !isListening) {
                                     IconButton(
                                         onClick = {
                                             imagePicker.launch(
@@ -1429,35 +1592,63 @@ class MainActivity : AppCompatActivity() {
                                     }
                                 }
                                 
-                                // Microphone icon (moved to right)
+                                // Microphone icon with circular background when listening
                                 IconButton(
                                     onClick = {
-                                        try {
-                                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                                                putExtra(
-                                                    RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                                                    RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                                        if (isListening) {
+                                            // Stop listening
+                                            speechRecognizer?.stopListening()
+                                            isListeningState.update { false }
+                                            voicePitchState.update { 0f }
+                                        } else {
+                                            // Check permission
+                                            if (ContextCompat.checkSelfPermission(
+                                                    context,
+                                                    Manifest.permission.RECORD_AUDIO
+                                                ) != PackageManager.PERMISSION_GRANTED
+                                            ) {
+                                                ActivityCompat.requestPermissions(
+                                                    this@MainActivity,
+                                                    arrayOf(Manifest.permission.RECORD_AUDIO),
+                                                    RECORD_AUDIO_PERMISSION_CODE
                                                 )
-                                                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
-                                                putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
+                                            } else {
+                                                // Start listening
+                                                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                                    putExtra(
+                                                        RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                                                        RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                                                    )
+                                                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
+                                                    putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                                                }
+                                                speechRecognizer?.startListening(intent)
                                             }
-                                            voiceInputLauncher.launch(intent)
-                                        } catch (e: Exception) {
-                                            Toast.makeText(
-                                                context,
-                                                "Voice input not available",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
                                         }
                                     },
                                     modifier = Modifier.size(40.dp)
                                 ) {
-                        Icon(
-                                        imageVector = Icons.Rounded.Mic,
-                                        contentDescription = "Voice input",
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.size(22.dp)
-                                    )
+                                    Box(
+                                        modifier = Modifier.size(40.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        // Circular background when listening
+                                        if (isListening) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(36.dp)
+                                                    .clip(CircleShape)
+                                                    .background(appColors.accent.copy(alpha = 0.2f))
+                                            )
+                                        }
+                                        
+                                        Icon(
+                                            imageVector = Icons.Rounded.Mic,
+                                            contentDescription = if (isListening) "Stop listening" else "Voice input",
+                                            tint = if (isListening) appColors.accent else MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
                                 }
                                 
                                 // Send/Stop button with scale animation
@@ -2028,11 +2219,14 @@ class MainActivity : AppCompatActivity() {
                 }
                 
                 // Speak button
+                val isTtsSpeaking by isTtsSpeakingState.collectAsState()
+                
                 IconButton(
                     onClick = {
                         if (isTtsInitialized && textToSpeech != null) {
                             if (textToSpeech!!.isSpeaking) {
                                 textToSpeech?.stop()
+                                isTtsSpeakingState.update { false }  // Immediately stop animation
                                 Toast.makeText(context, "Speech stopped", Toast.LENGTH_SHORT).show()
                             } else {
                             // Remove markdown formatting for better speech
@@ -2054,12 +2248,56 @@ class MainActivity : AppCompatActivity() {
                     },
                     modifier = Modifier.size(40.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.VolumeUp,
-                        contentDescription = "Speak",
-                        tint = appColors.textSecondary,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    // Animated pause icon when speaking, speaker icon when not
+                    if (isTtsSpeaking) {
+                        // Pulsing animation for pause icon
+                        val infiniteTransition = rememberInfiniteTransition(label = "pause_pulse")
+                        val pulseAlpha by infiniteTransition.animateFloat(
+                            initialValue = 0.6f,
+                            targetValue = 1f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(
+                                    durationMillis = 800,
+                                    easing = FastOutSlowInEasing
+                                ),
+                                repeatMode = RepeatMode.Reverse
+                            ),
+                            label = "pause_alpha"
+                        )
+                        
+                        val pulseScale by infiniteTransition.animateFloat(
+                            initialValue = 0.9f,
+                            targetValue = 1.1f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(
+                                    durationMillis = 800,
+                                    easing = FastOutSlowInEasing
+                                ),
+                                repeatMode = RepeatMode.Reverse
+                            ),
+                            label = "pause_scale"
+                        )
+                        
+                        Icon(
+                            imageVector = Icons.Rounded.Pause,
+                            contentDescription = "Stop speaking",
+                            tint = appColors.accent,
+                            modifier = Modifier
+                                .size(20.dp)
+                                .alpha(pulseAlpha)
+                                .graphicsLayer(
+                                    scaleX = pulseScale,
+                                    scaleY = pulseScale
+                                )
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.VolumeUp,
+                            contentDescription = "Speak",
+                            tint = appColors.textSecondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
                 
                 // Retry button with model selector
@@ -2294,13 +2532,6 @@ class MainActivity : AppCompatActivity() {
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(6.dp)
-                                                        .clip(CircleShape)
-                                                        .background(appColors.accent)
-                                                )
-                                                Spacer(modifier = Modifier.width(12.dp))
                                                 Text(
                                                     text = model.displayName,
                                                     color = if (model.apiModel == modelUsed)
@@ -2414,9 +2645,11 @@ class MainActivity : AppCompatActivity() {
         if (textToSpeech == null) return
         
         val maxLength = TextToSpeech.getMaxSpeechInputLength() - 100 // Buffer
+        val utteranceId = "tts_${System.currentTimeMillis()}"
         
         if (text.length <= maxLength) {
-            textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+            val params = Bundle()
+            textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
             return
         }
         
@@ -2424,6 +2657,7 @@ class MainActivity : AppCompatActivity() {
         textToSpeech?.speak("", TextToSpeech.QUEUE_FLUSH, null, null)
         
         var remainingText = text
+        var chunkIndex = 0
         while (remainingText.isNotEmpty()) {
             val chunk = if (remainingText.length > maxLength) {
                 // Find a good break point
@@ -2438,7 +2672,10 @@ class MainActivity : AppCompatActivity() {
                 remainingText
             }
             
-            textToSpeech?.speak(chunk, TextToSpeech.QUEUE_ADD, null, null)
+            val params = Bundle()
+            val chunkUtteranceId = "${utteranceId}_chunk_${chunkIndex}"
+            textToSpeech?.speak(chunk, TextToSpeech.QUEUE_ADD, params, chunkUtteranceId)
+            chunkIndex++
             
             remainingText = if (chunk.length < remainingText.length) {
                 remainingText.substring(chunk.length).trim()

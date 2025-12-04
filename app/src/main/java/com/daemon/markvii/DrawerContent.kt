@@ -109,7 +109,8 @@ fun DrawerContent(
                         }
                         onDismiss()
                     }
-                }
+                },
+                onSettingsClick = onSettingsClick
             )
         }
     }
@@ -117,7 +118,8 @@ fun DrawerContent(
 
 @Composable
 fun UnauthenticatedDrawerContent(
-    onSignIn: () -> Unit
+    onSignIn: () -> Unit,
+    onSettingsClick: () -> Unit = {}
 ) {
     val appColors = LocalAppColors.current
     
@@ -146,6 +148,15 @@ fun UnauthenticatedDrawerContent(
                     color = appColors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
+                )
+            }
+            
+            // Settings button
+            IconButton(onClick = onSettingsClick) {
+                Icon(
+                    imageVector = Icons.Rounded.Settings,
+                    contentDescription = "Settings",
+                    tint = appColors.textSecondary
                 )
             }
         }
