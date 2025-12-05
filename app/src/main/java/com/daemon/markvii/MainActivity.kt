@@ -176,6 +176,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.luminance
+import com.airbnb.lottie.compose.animateLottieCompositionAsState
 
 class MainActivity : AppCompatActivity() {
 
@@ -236,6 +237,9 @@ class MainActivity : AppCompatActivity() {
         
         // Initialize ThemePreferences
         com.daemon.markvii.data.ThemePreferences.init(applicationContext)
+
+        // Initialize OnboardingPreferences
+        com.daemon.markvii.data.OnboardingPreferences.init(applicationContext)
         
         // Initialize TextToSpeech
         textToSpeech = TextToSpeech(this) { status ->
@@ -359,9 +363,19 @@ class MainActivity : AppCompatActivity() {
                 )
 
                 {
-//                    for switching between from home screen to infoTab
-                    val navController = rememberNavController()
-                    NavHost(navController = navController, startDestination = "home", builder = {
+                    var isOnboarding by remember { mutableStateOf(com.daemon.markvii.data.OnboardingPreferences.isFirstRun()) }
+
+                    if (isOnboarding) {
+                        com.daemon.markvii.ui.OnboardingScreen(
+                            onFinish = {
+                                com.daemon.markvii.data.OnboardingPreferences.setFirstRunCompleted()
+                                isOnboarding = false
+                            }
+                        )
+                    } else {
+                        // for switching between from home screen to infoTab
+                        val navController = rememberNavController()
+                        NavHost(navController = navController, startDestination = "home", builder = {
                         composable("home",){
                             opentimes++
                             
@@ -574,14 +588,16 @@ class MainActivity : AppCompatActivity() {
                             InfoSetting() // starting infoTab ui (About section)
                         }
 
-                    })
+                        })
+
+                    }
+                    }
 
 
                 }
 
             }
         }
-    }
     
     override fun onDestroy() {
         // Shutdown TextToSpeech to free resources
@@ -822,16 +838,21 @@ class MainActivity : AppCompatActivity() {
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        androidx.compose.material3.CircularProgressIndicator(
-                            modifier = Modifier.size(60.dp),
-                            color = appColors.accent,
-                            strokeWidth = 4.dp
+                        val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.loading))
+                        val progress by animateLottieCompositionAsState(
+                            composition = composition,
+                            iterations = LottieConstants.IterateForever
+                        )
+                        LottieAnimation(
+                            composition = composition,
+                            progress = { progress },
+                            modifier = Modifier.size(100.dp)
                         )
                         Text(
-                            text = "Loading free models...",
-                            fontSize = 16.sp,
+                            text = "Fetching models...",
+                            fontSize = 18.sp,
                             color = MaterialTheme.colorScheme.onSurface,
-                            fontFamily = FontFamily(Font(R.font.typographica))
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 },
