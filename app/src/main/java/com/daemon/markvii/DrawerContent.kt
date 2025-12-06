@@ -110,6 +110,10 @@ fun DrawerContent(
                         onDismiss()
                     }
                 },
+                onNewChat = {
+                    chatViewModel.onEvent(ChatUiEvent.CreateNewSession)
+                    onDismiss()
+                },
                 onSettingsClick = onSettingsClick
             )
         }
@@ -119,6 +123,7 @@ fun DrawerContent(
 @Composable
 fun UnauthenticatedDrawerContent(
     onSignIn: () -> Unit,
+    onNewChat: () -> Unit,
     onSettingsClick: () -> Unit = {}
 ) {
     val appColors = LocalAppColors.current
@@ -164,6 +169,34 @@ fun UnauthenticatedDrawerContent(
         Divider(color = appColors.divider, thickness = 1.dp)
         
         Spacer(modifier = Modifier.height(12.dp))
+
+        // New chat button
+        Button(
+            onClick = onNewChat,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = appColors.accent,
+                contentColor = if (appColors.accent == MaterialTheme.colorScheme.primary) Color.White else Color.Black
+            ),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .height(48.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Add,
+                contentDescription = "New chat",
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "New Chat",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
         
         // Chat sessions list header
         Text(

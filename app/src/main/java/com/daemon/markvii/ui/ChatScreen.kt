@@ -48,7 +48,6 @@ import com.daemon.markvii.ApiProvider
 import com.daemon.markvii.data.ChatData
 import com.daemon.markvii.data.ModelInfo
 import com.daemon.markvii.ui.components.ModelChatItem
-import com.daemon.markvii.ui.components.PromptSuggestionBubbles
 import com.daemon.markvii.ui.components.UserChatItem
 import com.daemon.markvii.ui.theme.LocalAppColors
 import com.daemon.markvii.ChatUiEvent
@@ -257,7 +256,7 @@ fun ChatScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(top = paddingValues.calculateTopPadding())) {
+    ) {
 //            Chat messages list - extends to bottom of screen
         Box(
             modifier = Modifier
@@ -268,10 +267,10 @@ fun ChatScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(bottom = 140.dp),
+                        .padding(bottom = 100.dp), // Adjusted padding for better centering
                     contentAlignment = Alignment.Center
                 ) {
-                    PromptSuggestionBubbles(
+                    com.daemon.markvii.ui.components.ExploreStyleSuggestions(
                         onSuggestionClick = { suggestion ->
                             chaViewModel.onEvent(ChatUiEvent.UpdatePrompt(suggestion))
                         }
@@ -297,10 +296,14 @@ fun ChatScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
+                    .imePadding() // Verify chats don't hide behind keyboard
                     .padding(horizontal = 8.dp),
                 state = listState,
                 reverseLayout = true,
-                contentPadding = PaddingValues(bottom = 140.dp) // Space for prompt box
+                contentPadding = PaddingValues(
+                    bottom = 140.dp,
+                    top = paddingValues.calculateTopPadding() + 8.dp // Add top padding + spacing
+                )
             ) {
                 itemsIndexed(
                     items = chatState.chatList,
@@ -358,6 +361,22 @@ fun ChatScreen(
                             colors = listOf(
                                 Color.Transparent,
                                 MaterialTheme.colorScheme.background
+                            )
+                        )
+                    )
+            )
+            
+            // Fade effect at top
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+                    .align(Alignment.TopCenter)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.background,
+                                Color.Transparent
                             )
                         )
                     )

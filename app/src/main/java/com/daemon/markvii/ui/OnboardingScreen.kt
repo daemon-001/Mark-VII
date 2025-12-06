@@ -1,11 +1,15 @@
 package com.daemon.markvii.ui
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -126,31 +130,36 @@ fun OnboardingScreen(
                     ),
                     contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
                 ) {
-                    AnimatedVisibility(
-                        visible = pagerState.currentPage < 2,
-                        enter = fadeIn(),
-                        exit = fadeOut()
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-                            contentDescription = "Next"
-                        )
-                    }
-                    AnimatedVisibility(
-                        visible = pagerState.currentPage == 2,
-                        enter = fadeIn(),
-                        exit = fadeOut()
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "Get Started",
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
+                    AnimatedContent(
+                        targetState = pagerState.currentPage == 2,
+                        transitionSpec = {
+                            if (targetState) {
+                                (fadeIn() + expandHorizontally(expandFrom = Alignment.CenterHorizontally)) togetherWith
+                                        (fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.CenterHorizontally))
+                            } else {
+                                (fadeIn() + expandHorizontally(expandFrom = Alignment.CenterHorizontally)) togetherWith
+                                        (fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.CenterHorizontally))
+                            }
+                        },
+                        label = "buttonTransition"
+                    ) { isLastPage ->
+                        if (isLastPage) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Get Started",
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Icon(
+                                    imageVector = Icons.Rounded.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        } else {
                             Icon(
-                                imageVector = Icons.Rounded.Check,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                                contentDescription = "Next"
                             )
                         }
                     }

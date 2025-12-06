@@ -287,13 +287,13 @@ fun ModelChatItem(
                     clipboard.setPrimaryClip(clip)
                     Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
                 },
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(32.dp)
             ) {
                 Icon(
                     imageVector = Icons.Rounded.ContentCopy,
                     contentDescription = "Copy",
                     tint = appColors.textSecondary,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
             
@@ -323,7 +323,7 @@ fun ModelChatItem(
                         Toast.makeText(context, "Text-to-speech not ready", Toast.LENGTH_SHORT).show()
                     }
                 },
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(32.dp)
             ) {
                 // Animated pause icon when speaking, speaker icon when not
                 if (isTtsSpeaking) {
@@ -360,7 +360,7 @@ fun ModelChatItem(
                         contentDescription = "Stop speaking",
                         tint = appColors.accent,
                         modifier = Modifier
-                            .size(20.dp)
+                            .size(16.dp)
                             .alpha(pulseAlpha)
                             .graphicsLayer(
                                 scaleX = pulseScale,
@@ -372,7 +372,7 @@ fun ModelChatItem(
                         imageVector = Icons.AutoMirrored.Rounded.VolumeUp,
                         contentDescription = "Speak",
                         tint = appColors.textSecondary,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
@@ -382,26 +382,26 @@ fun ModelChatItem(
                 onClick = {
                     showModelSelector = true
                 },
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(32.dp)
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Refresh,
                     contentDescription = "Retry with different model",
                     tint = appColors.textSecondary,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
             
             // Export PDF button
             IconButton(
                 onClick = { showExportDialog = true },
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(32.dp)
             ) {
                 Icon(
                     imageVector = Icons.Rounded.PictureAsPdf,
                     contentDescription = "Export PDF",
                     tint = appColors.textSecondary,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
             
@@ -415,13 +415,13 @@ fun ModelChatItem(
                     }
                     context.startActivity(Intent.createChooser(shareIntent, "Share response"))
                 },
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(32.dp)
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Share,
                     contentDescription = "Share",
                     tint = appColors.textSecondary,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }

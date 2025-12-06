@@ -427,18 +427,28 @@ class MainActivity : AppCompatActivity() {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(appColors.topBarBackground)
+                                        .background(
+                                            Brush.verticalGradient(
+                                                colors = listOf(
+                                                    appColors.topBarBackground, // Solid at top
+                                                    appColors.topBarBackground.copy(alpha = 0.95f), // Slightly transparent
+                                                    appColors.topBarBackground.copy(alpha = 0f) // Transparent at bottom
+                                                )
+                                            )
+                                        )
                                 ) {
                                     Box(
                                         modifier = Modifier
                                             .statusBarsPadding()
-                                            .height(64.dp)
+                                            .height(100.dp)
                                             .fillMaxWidth()
                                             .padding(horizontal = 12.dp)
                                     ) {
                                     Row(
-                                        modifier = Modifier.fillMaxSize(),
-                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(top = 8.dp), // Add some top padding
+                                        verticalAlignment = Alignment.Top,
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         // Left side: Drawer Icon / Profile Picture + Title
