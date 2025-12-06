@@ -154,8 +154,8 @@ fun InfoSetting() {
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "App Version: v3.0",
-                        fontFamily = FontFamily(Font(R.font.typographica)),
+                        text = "App Version: v3.1.0 (30100)",
+                        fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
                         color = appColors.textSecondary,
                     )
@@ -169,8 +169,7 @@ fun InfoSetting() {
                             style = SpanStyle(
                                 color = MaterialTheme.colorScheme.primary,
                                 fontSize = 14.sp,
-                                textDecoration = TextDecoration.Underline,
-                                fontFamily = FontFamily(Font(R.font.typographica))
+                                textDecoration = TextDecoration.Underline
                             )
                         ) {
                             append("GitHub Repository")

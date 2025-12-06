@@ -3,6 +3,21 @@
 All notable changes to the Mark VII project are documented in this file.
 
 ---
+## v3.1.0 (30100) 
+December 7, 2025 05:20:00 +0530
+
+### Explore UI & Guest Experience
+- **New Explore UI**: Replaced the empty state "Getting Started" guide with a dynamic "Explore" screen featuring a "Bot Hello" Lottie animation and quick-access feature chips (Gemini 1.5 Pro, Image Analysis, PDF Export, etc.).
+- **Guest "New Chat"**: Enabled the "New Chat" button in the navigation drawer for guest users, allowing them to easily reset sessions without signing in.
+
+### UI/UX Refinements
+- **Immersive Chat List**: Added smooth gradient fade effects at both the top and bottom of the chat list.
+- **Top Bar Redesign**: Increased top bar height and added a vertical gradient background for a seamless "fade-under" scrolling effect.
+- **Keyboard Optimization**: Fixed issue where chat messages were hidden behind the keyboard by properly handling IME insets.
+- **Compact Action Buttons**: Reduced the size of chat action buttons (Copy, Speak, Retry, Share, Export) for a cleaner, less intrusive look.
+- **Onboarding Animation**: Smoothed out the transition animation for the "Get Started" button on the onboarding screen.
+
+---
 
 ## [3.0.0]
 

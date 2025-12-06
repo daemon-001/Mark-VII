@@ -47,18 +47,7 @@ fun ExploreStyleSuggestions(onSuggestionClick: (String) -> Unit) {
         
         Spacer(modifier = Modifier.height(20.dp))
         
-        // Lottie Animation
-        val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.bot_hello))
-        val progress by animateLottieCompositionAsState(
-            composition = composition,
-            iterations = LottieConstants.IterateForever
-        )
-        
-        LottieAnimation(
-            composition = composition,
-            progress = { progress },
-            modifier = Modifier.size(160.dp)
-        )
+
 
         Spacer(modifier = Modifier.height(20.dp))
 
