@@ -63,6 +63,7 @@ fun OnboardingScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .systemBarsPadding()
                 .padding(bottom = 32.dp), // Space for bottom controls
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
