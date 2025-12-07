@@ -120,8 +120,8 @@ object OpenRouterClient {
     private var apiKey: String = ""
     
     fun updateApiKey(newKey: String) {
-        if (newKey.isNotEmpty()) {
-            apiKey = newKey
+        if (newKey.isNotBlank()) {
+            apiKey = newKey.trim()
         }
     }
     
@@ -161,5 +161,37 @@ object OpenRouterClient {
         .build()
     
     val api: OpenRouterApiService = retrofit.create(OpenRouterApiService::class.java)
+
+    /**
+     * Verify API key validity
+     */
+    suspend fun verifyKey(keyToVerify: String): Boolean {
+        if (keyToVerify.isBlank()) return false
+        
+        return try {
+            val request = okhttp3.Request.Builder()
+                .url(BASE_URL + "auth/key")
+                .addHeader("Authorization", "Bearer $keyToVerify")
+                .get()
+                .build()
+            
+            // Use a new client to avoid interceptors interfering
+            val client = OkHttpClient.Builder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(10, TimeUnit.SECONDS)
+                .build()
+                
+            val response = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                client.newCall(request).execute()
+            }
+            
+            val isSuccess = response.isSuccessful
+            response.close()
+            isSuccess
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
 }
 

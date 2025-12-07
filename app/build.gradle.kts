@@ -13,8 +13,8 @@ android {
         applicationId = "com.daemon.markvii"
         minSdk = 24
         targetSdk = 34
-        versionCode = 30100
-        versionName = "3.1.0"
+        versionCode = 30200
+        versionName = "3.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

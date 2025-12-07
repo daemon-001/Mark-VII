@@ -20,7 +20,7 @@ object GeminiClient {
      * Update API key and reinitialize model
      */
     fun updateApiKey(newKey: String) {
-        apiKey = newKey
+        apiKey = newKey.trim()
         currentModel = null
     }
     
@@ -214,6 +214,32 @@ object GeminiClient {
                 else -> "GEMINI_ERROR|${e.message ?: "Unknown error occurred"}"
             }
             throw Exception(errorMessage)
+        }
+    }
+    /**
+     * Verify API key validity
+     */
+    suspend fun verifyKey(keyToVerify: String): Boolean {
+        if (keyToVerify.isBlank()) return false
+        
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                // Use direct HTTP request to verify key avoid SDK initialization issues
+                val url = java.net.URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash?key=$keyToVerify")
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.connectTimeout = 10000
+                connection.readTimeout = 10000
+                
+                val responseCode = connection.responseCode
+                connection.disconnect()
+                
+                // 200 OK means the key is valid and has access to the model
+                responseCode == 200
+            } catch (e: Exception) {
+                Log.e(TAG, "Key verification failed: ${e.message}", e)
+                false
+            }
         }
     }
 }

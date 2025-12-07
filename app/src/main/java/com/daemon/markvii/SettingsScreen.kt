@@ -1,5 +1,6 @@
 package com.daemon.markvii
 
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import com.daemon.markvii.data.AppTheme
 import com.daemon.markvii.data.ThemePreferences
 import com.daemon.markvii.ui.theme.LocalAppColors
+import com.daemon.markvii.ui.UserApiConfigItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -154,7 +156,48 @@ fun SettingsScreen(
                 }
             }
             
-            // Account Section - Only show for authenticated users
+            // Your APIs Section
+            Text(
+                text = "Your APIs",
+                fontSize = 14.sp,
+                color = appColors.textSecondary,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+            )
+            
+            val geminiKey by com.daemon.markvii.data.UserApiPreferences.geminiApiKey.collectAsState()
+            val isGeminiEnabled by com.daemon.markvii.data.UserApiPreferences.isGeminiKeyEnabled.collectAsState()
+            val openRouterKey by com.daemon.markvii.data.UserApiPreferences.openRouterApiKey.collectAsState()
+            val isOpenRouterEnabled by com.daemon.markvii.data.UserApiPreferences.isOpenRouterKeyEnabled.collectAsState()
+            val context = androidx.compose.ui.platform.LocalContext.current
+            
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Gemini API Config
+                UserApiConfigItem(
+                    title = "Gemini API Key",
+                    apiKey = geminiKey,
+                    isEnabled = isGeminiEnabled,
+                    getKeyUrl = "https://aistudio.google.com/app/apikey",
+                    onKeyChanged = { com.daemon.markvii.data.UserApiPreferences.setGeminiApiKey(it) },
+                    onEnabledChanged = { com.daemon.markvii.data.UserApiPreferences.setGeminiKeyEnabled(it) },
+                    onVerify = { key -> com.daemon.markvii.data.GeminiClient.verifyKey(key) },
+                    appColors = appColors
+                )
+                
+                // OpenRouter API Config
+                UserApiConfigItem(
+                    title = "OpenRouter API Key",
+                    apiKey = openRouterKey,
+                    isEnabled = isOpenRouterEnabled,
+                    getKeyUrl = "https://openrouter.ai/keys",
+                    onKeyChanged = { com.daemon.markvii.data.UserApiPreferences.setOpenRouterApiKey(it) },
+                    onEnabledChanged = { com.daemon.markvii.data.UserApiPreferences.setOpenRouterKeyEnabled(it) },
+                    onVerify = { key -> com.daemon.markvii.data.OpenRouterClient.verifyKey(key) },
+                    appColors = appColors
+                )
+            }
             if (isUserAuthenticated) {
                 Text(
                     text = "Account",

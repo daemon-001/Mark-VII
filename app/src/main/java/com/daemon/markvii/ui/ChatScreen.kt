@@ -53,6 +53,7 @@ import com.daemon.markvii.ui.theme.LocalAppColors
 import com.daemon.markvii.ChatUiEvent
 import com.daemon.markvii.ChatViewModel
 import com.daemon.markvii.data.FirebaseConfigManager
+import com.daemon.markvii.data.FirebaseConfigManager.exceptionModels
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -120,16 +121,41 @@ fun ChatScreen(
         FirebaseConfigManager.initialize()
     }
     
-    // Update API keys when Firebase data changes
-    LaunchedEffect(firebaseApiKey) {
-        if (firebaseApiKey.isNotEmpty()) {
-            ChatData.updateApiKey(firebaseApiKey)
+    // Verify Firebase keys first
+    LaunchedEffect(firebaseApiKey, exceptionModels) {
+        // This effect handles model loading based on firebase key
+        // Actual key usage for generation is handled below
+    }
+
+    // Observe User API Preferences
+    val userGeminiKey by com.daemon.markvii.data.UserApiPreferences.geminiApiKey.collectAsState()
+    val isUserGeminiEnabled by com.daemon.markvii.data.UserApiPreferences.isGeminiKeyEnabled.collectAsState()
+    
+    val userOpenRouterKey by com.daemon.markvii.data.UserApiPreferences.openRouterApiKey.collectAsState()
+    val isUserOpenRouterEnabled by com.daemon.markvii.data.UserApiPreferences.isOpenRouterKeyEnabled.collectAsState()
+
+    // Update API keys - Prioritize User Keys
+    LaunchedEffect(firebaseApiKey, userOpenRouterKey, isUserOpenRouterEnabled) {
+        val keyToUse = if (isUserOpenRouterEnabled && userOpenRouterKey.isNotBlank()) {
+            userOpenRouterKey
+        } else {
+            firebaseApiKey
+        }
+        
+        if (keyToUse.isNotEmpty()) {
+            ChatData.updateApiKey(keyToUse)
         }
     }
     
-    LaunchedEffect(geminiApiKey) {
-        if (geminiApiKey.isNotEmpty()) {
-            com.daemon.markvii.data.GeminiClient.updateApiKey(geminiApiKey)
+    LaunchedEffect(geminiApiKey, userGeminiKey, isUserGeminiEnabled) {
+        val keyToUse = if (isUserGeminiEnabled && userGeminiKey.isNotBlank()) {
+            userGeminiKey
+        } else {
+            geminiApiKey
+        }
+        
+        if (keyToUse.isNotEmpty()) {
+            com.daemon.markvii.data.GeminiClient.updateApiKey(keyToUse)
         }
     }
     
