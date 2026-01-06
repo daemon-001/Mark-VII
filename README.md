@@ -30,6 +30,15 @@
 - 🔒 **Enterprise Security** - Firebase Authentication, encrypted storage, HTTPS only
 - 🐍 **DevOps Tools** - Python CLI for bulk model management via CSV
 
+### Visuals
+<img width="1118" height="800" alt="m1" src="https://github.com/user-attachments/assets/c5a8575e-48f3-43e4-ab90-5a98f60775c7" />
+<img width="1118" height="800" alt="m2" src="https://github.com/user-attachments/assets/98359ad0-b0dc-4518-af20-b8f53af41040" />
+<img width="1118" height="800" alt="m3" src="https://github.com/user-attachments/assets/4f87282a-7cdc-4802-a73b-4c2e1f9ba434" />
+
+### Usage across models from OpenRouter
+<img width="1118" height="800" alt="m4" src="https://github.com/user-attachments/assets/b83d3369-4f14-4b49-811c-e9967ba1a51c" />
+
+
 ### Why Mark VII?
 
 **Flexibility:** Switch between providers and models instantly without code changes  
