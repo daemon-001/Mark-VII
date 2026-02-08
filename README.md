@@ -2,14 +2,14 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-3.2.0-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Android-green.svg)
 ![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 
 **Enterprise-grade multi-provider AI chat platform with 45+ models, Firebase cloud configuration, and modern Material 3 design.**
 
-[Features](#features) • [Quick Start](#quick-start) • [Download](#download) • [Documentation](#documentation)
+[Features](#features) • [Quick Start](#quick-start) • [Download](#download) • [Documentation](#support--contact)
 
 </div>
 
@@ -17,14 +17,14 @@
 
 ## Overview
 
-**Mark VII** is a production-ready AI chat application for Android that provides unified access to 45+ state-of-the-art AI models from leading providers including Anthropic, OpenAI, Meta, Deepseek, Mistral, Google, and more through a single, elegant interface.
+**Mark VII** is a multi LLMs chat application for Android that provides unified access to 45+ state-of-the-art AI models from leading providers including Anthropic, OpenAI, Meta, Deepseek, Mistral, Google, and more through a single, elegant interface.
 
 ### Key Capabilities
 
 - 🤖 **45+ AI Models** - Gemini, GPT, Llama, Deepseek, Mistral, and more
 - 🔥 **Cloud-First Architecture** - Firebase-powered configuration management and real-time sync
 - ⚡ **High Performance** - <100ms startup, connection pooling, optimized streaming
-- 🎨 **Dual API Support** - OpenRouter (40+ models) + Direct Gemini API
+- 🔗 **Dual API Support** - OpenRouter (40+ models) + Direct Gemini API
 - 📱 **Modern Material 3 UI** - Dynamic theming, smooth animations, haptic feedback
 - 🌐 **Multilingual TTS** - Automatic language detection for 15+ languages
 - 🔒 **Enterprise Security** - Firebase Authentication, encrypted storage, HTTPS only
@@ -43,7 +43,7 @@
 
 **Flexibility:** Switch between providers and models instantly without code changes  
 **Reliability:** Automatic error recovery, exception handling, offline capability  
-**Performance:** 24x faster than v1.x, real-time streaming, optimized rendering  
+**Performance:** 24x faster than v1.x of Mark-VII, real-time streaming, optimized rendering  
 **Developer-Friendly:** Complete Firebase integration, comprehensive documentation, open source
 
 ---
@@ -120,21 +120,43 @@
 
 ### 🛠️ Management Tools
 
-**Python CLI:**
+Efficiently manage 45+ AI models using CSV-based workflows.
+
+**Features:**
+- **Bulk Import/Export** - Manage models in Excel/Google Sheets
+- **Validation** - Automatic format and field checking
+- **Version Control** - Track changes with Git
+- **Interactive CLI** - Menu-driven operations
+- **Zero Downtime** - Update models without app redeployment
+
+**Python CLI Usage:**
 ```bash
-# Import models from CSV
+cd update_models
+
+# Import models from CSV (recommended)
 python update_firebase_models.py --csv models.csv
 
-# List current configuration
+# List current models in Firestore
 python update_firebase_models.py --list
 
 # Interactive mode
 python update_firebase_models.py
+
+# Export models to CSV
+python update_firebase_models.py --export my_models.csv
 ```
 
-**CSV Bulk Management:**
+**CSV Format:**
+```csv
+apiModel,displayName,isAvailable,order
+google/gemini-2.0-flash-exp,Gemini 2.0 Flash,TRUE,1
+deepseek/deepseek-chat-v3.1,Deepseek Chat V3.1,TRUE,2
+anthropic/claude-3-5-sonnet-20241022,Claude 3.5 Sonnet,TRUE,3
+```
+
+**Benefits:**
 - Edit 50+ models in Excel/Google Sheets
-- Bulk enable/disable toggles
+- Bulk enable/disable models
 - Easy reordering with sort priority
 - Version control friendly
 - Automatic validation
@@ -224,6 +246,7 @@ python update_firebase_models.py --csv models.csv
 ---
 
 ## Installation
+<a id="download"></a>
 
 ### End Users
 
@@ -243,63 +266,8 @@ See [Quick Start](#quick-start) above for source-based setup.
 
 ---
 
-## Python Management Tools
 
-Efficiently manage 45+ AI models using CSV-based workflows.
-
-### Features
-
-- **Bulk Import/Export** - Manage models in Excel/Google Sheets
-- **Validation** - Automatic format and field checking
-- **Version Control** - Track changes with Git
-- **Interactive CLI** - Menu-driven operations
-- **Zero Downtime** - Update models without app redeployment
-
-### Usage
-
-```bash
-cd update_models
-
-# Import models from CSV (recommended)
-python update_firebase_models.py --csv models.csv
-
-# List current models in Firestore
-python update_firebase_models.py --list
-
-# Interactive mode
-python update_firebase_models.py
-
-# Export models to CSV
-python update_firebase_models.py --export my_models.csv
-```
-
-### CSV Format
-```csv
-apiModel,displayName,isAvailable,order
-google/gemini-2.0-flash-exp,Gemini 2.0 Flash,TRUE,1
-deepseek/deepseek-chat-v3.1,Deepseek Chat V3.1,TRUE,2
-anthropic/claude-3-5-sonnet-20241022,Claude 3.5 Sonnet,TRUE,3
-```
-
-**Benefits:**
-- Edit 50+ models in Excel/Google Sheets
-- Bulk enable/disable models
-- Easy reordering
-- Version control friendly
-
----
-
-## Documentation
-
-### Setup Guides
-- **CHANGELOG.md** - Complete version history and changes
-- **Firebase Setup** - See Quick Start section above
-
-### Python Tools
-- **update_models/update_firebase_models.py** - Model management script
-- **update_models/models.csv** - Sample CSV with 49 models
-
-### Troubleshooting
+## Troubleshooting
 
 #### "Firebase not configured" in app
 - Check Firestore structure: `app_config/models` document must have `list` field (not `models`)
@@ -531,15 +499,17 @@ Mark-VII/
 
 ---
 
-## Performance Metrics
+## Performance
 
-### Startup Performance
+### Current Metrics (v3.2.0)
+
+**Startup Performance:**
 - **Cold Start:** <100ms (24x faster than v1.x)
 - **Model Loading:** <50ms (cached configuration)
 - **Theme Application:** <10ms (instant visual feedback)
 - **Firebase Init:** Asynchronous, non-blocking
 
-### Runtime Optimization
+**Runtime Optimization:**
 - **Streaming Latency:** <500ms to first token
 - **Rendering:** 60 FPS with memoized composables
 - **Memory:** <50MB baseline, <150MB during streaming
@@ -548,41 +518,42 @@ Mark-VII/
 
 *Note: Times vary based on network, server load, and prompt complexity.*
 
+### Version Comparison
+
+| Metric                | v1.x (Gemini)      | v2.x (OpenRouter)  | v3.0+ (Dual API)   | Improvement      |
+|-----------------------|--------------------|--------------------|--------------------|--------------------|
+| **Startup Time**      | ~2.65s             | ~110ms             | <100ms             | **26.5x faster**   |
+| **Models Available**  | 5-10               | 100+               | 100+ (dual APIs)   | **10-20x more**    |
+| **API Providers**     | 1 (Google)         | Multiple           | OpenRouter + Gemini| **Direct + unified**|
+| **Configuration**     | Hardcoded          | Cloud-based        | Cloud + real-time  | **Instant updates**|
+| **Streaming**         | No                 | Yes (SSE)          | Yes (both APIs)    | **Real-time**      |
+| **Error Handling**    | Basic              | Comprehensive      | Auto-retry + 404 fix| **Resilient**     |
+| **TTS Languages**     | 1-2                | 1-2                | 15+ (MLKit)        | **7x more**        |
+| **Theme Support**     | Basic              | Light/Dark         | L/D/System + iOS-style | **Polished**   |
+| **Offline Support**   | No                 | Limited            | Cached config      | **Works offline**  |
+| **Stop Generation**   | No                 | Yes                | Yes + haptics      | **User control**   |
+
 ---
 
 ## Contributing
 
 We welcome contributions from the community! Whether you're fixing bugs, adding features, or improving documentation, your help makes Mark VII better.
 
-### How to Contribute
-
 **Reporting Issues:**
 1. [Open an issue](https://github.com/daemon-001/Mark-VII/issues/new)
-2. Add screenshots if helpful
+2. Include: Android version, app version, steps to reproduce
+3. Add screenshots if helpful
 
-**Suggesting Features:**
-1. Open a [Feature Request](https://github.com/daemon-001/Mark-VII/issues/new?template=feature_request.md)
+**Feature Requests:**
+1. Open a [Feature Request](https://github.com/daemon-001/Mark-VII/issues/new?template=feature_request.md) with tag `enhancement`
 2. Describe the feature and its use case
 3. Provide mockups/examples if relevant
-
-### Feature Requests
-- Open an issue with tag `enhancement`
-- Describe the feature and use case
-- Discuss with maintainers before implementing
-
-### Pull Requests
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature-name`
-3. Make changes and test thoroughly
-4. Commit: `git commit -m "Add: feature description"`
-5. Push: `git push origin feature-name`
-4. Explain why it would benefit users
-5. Provide mockups/examples if relevant
+4. Discuss with maintainers before implementing
 
 **Code Contributions:**
 1. Fork the repository
 2. Create feature branch: `git checkout -b feature/your-feature-name`
-3. Make changes following code style guidelines (see below)
+3. Make changes following Kotlin code style guidelines
 4. Test thoroughly on multiple devices/Android versions
 5. Commit with clear messages: `git commit -m "Add: Feature description"`
 6. Push to your fork: `git push origin feature/your-feature-name`
@@ -632,27 +603,6 @@ coil-compose:2.4.0              // Image loading
 
 ---
 
-## Performance Comparison
-
-### Version 3.0 vs Previous Releases
-
-| Metric                | v1.x (Gemini)      | v2.x (OpenRouter)  | v3.0 (Dual API)    | Improvement      |
-|-----------------------|--------------------|--------------------|--------------------|--------------------|
-| **Startup Time**      | ~2.65s             | ~110ms             | <100ms             | **26.5x faster**   |
-| **Models Available**  | 5-10               | 100+               | 100+ (dual APIs)   | **10-20x more**    |
-| **API Providers**     | 1 (Google)         | Multiple           | OpenRouter + Gemini| **Direct + unified**|
-| **Configuration**     | Hardcoded          | Cloud-based        | Cloud + real-time  | **Instant updates**|
-| **Streaming**         | No                 | Yes (SSE)          | Yes (both APIs)    | **Real-time**      |
-| **Error Handling**    | Basic              | Comprehensive      | Auto-retry + 404 fix| **Resilient**     |
-| **TTS Languages**     | 1-2                | 1-2                | 15+ (MLKit)        | **7x more**        |
-| **Theme Support**     | Basic              | Light/Dark         | L/D/System + iOS-style | **Polished**   |
-| **Offline Support**   | No                 | Limited            | Cached config      | **Works offline**  |
-| **Stop Generation**   | No                 | Yes                | Yes + haptics      | **User control**   |
-
----
-
----
-
 ## Security & Privacy
 
 ### Data Protection
@@ -684,110 +634,6 @@ coil-compose:2.4.0              // Image loading
 
 ---
 
-## Supported Models
-
-**Dual API Architecture:**  
-Mark VII integrates both **OpenRouter** and **Gemini API** services, providing flexible access to multiple AI providers through a unified interface.
-
-**OpenRouter Integration:**
-- Direct connection to OpenRouter's model ecosystem
-- Automatically fetches available models from OpenRouter API
-- 45+ models from leading AI providers
-- Real-time model catalog synchronization
-- Unified API for multiple providers (Anthropic, OpenAI, Meta, Mistral, Deepseek, etc.)
-
-**Gemini API Integration:**
-- Direct Google Gemini API support (separate from OpenRouter)
-- Dedicated Gemini model access
-- Vision capabilities for image understanding
-- Toggle between OpenRouter and Gemini in-app
-
-**Firebase Cloud Configuration:**
-- Models managed in Firestore for instant updates
-- No app rebuild required to add/remove models
-- Changes reflect on app restart
-
-**Supported Companies & Providers:**
-- **Google** - Gemini 2.0/2.5 Flash, Gemini Pro, Gemma 2/3 variants (via both OpenRouter and direct Gemini API)
-- **Deepseek** - Deepseek Chat V3.1, R1, R1 Distill Llama/Qwen, R1 Zero
-- **Meta** - Llama 3.1 (8B/70B/405B), Llama 3.3 70B, Llama 4 Maverick/Scout
-- **Qwen (Alibaba)** - Qwen2.5 (7B/72B), Qwen3 Coder (8B/32B), Qwen3 235B
-- **Mistral AI** - Mistral Large, Medium, Small, 7B, Nemo
-- **xAI** - Grok Beta, Grok Vision Beta
-- **Anthropic** - Claude 3.5 Sonnet, Claude 3 Opus/Haiku
-- **OpenAI** - GPT-4 Turbo, GPT-4, GPT-4o, GPT-3.5 Turbo
-- **30+ additional AI companies** - Cohere, AI21 Labs, Perplexity AI, and many more through OpenRouter
-
-*Complete model list with specific variants available in `update_models/models.csv`*
-
-
-**Management Tools:**
-- **API Toggle:** Switch between OpenRouter and Gemini API in Settings
-- **Firebase Console:** Add/remove models directly in Firestore
-- **CSV Bulk Import:** Edit `update_models/models.csv` and run Python script
-- **Python CLI:** Interactive model management with `update_firebase_models.py`
-- **No App Updates Required:** Changes reflect on next app restart
-
-**Exception Models:**  
-Some OpenRouter models require `:free` suffix for free-tier access. The app automatically detects 404 errors, adds models to `exp_models` collection, and retries with correct format.
-
-**Data Structure:**  
-Models stored in Firebase at `app_config/models/list` (array) with fields:
-- `apiModel` - OpenRouter/Gemini model identifier
-- `displayName` - User-friendly name shown in app
-- `isAvailable` - Enable/disable toggle
-- `order` - Sort position in dropdown
-
-**API Keys:**  
-Stored in Firebase at `app_config/api_keys`:
-- `openrouterApiKey` - Required for OpenRouter models
-- `geminiApiKey` - Optional for direct Gemini API access
-
-**Quick Setup:**
-```bash
-cd update_models
-python update_firebase_models.py --csv models.csv
-```
-
-See `update_models/models.csv` for complete pre-configured model list with 45+ entries.
-
----
-
-## Screenshots
-
-### Main Chat Interface
-![Mark VII Chat](https://github.com/user-attachments/assets/5ef5e209-fb29-47e3-b8b1-0bd9999a3ea9)
-
-
----
-
-## Download
-
-### Official Releases
-
-**Latest Stable Version:**
-- [GitHub Releases](https://github.com/daemon-001/Mark-VII/releases/latest) - v1.1
-- Release Date: Dec 10, 2024
-- Changelog: See [CHANGELOG.md](CHANGELOG.md)
-
-**Development Builds:**
-- Available in [Pre-releases](https://github.com/daemon-001/Mark-VII/releases)
-- Includes experimental features and beta testing
-
-### System Requirements
-- **Minimum:** Android 7.0 Nougat (API 24)
-- **Target:** Android 15 (API 35)
-- **Recommended:** Android 10+ for best performance
-- **Storage:** ~50MB app + ~100MB cache
-- **Internet:** Required for AI model access (offline config supported)
-
----
-
-
-See [LICENSE](LICENSE) file for full terms.
-
----
-
 ## Support & Contact
 
 ### Get Help
@@ -807,55 +653,21 @@ See [LICENSE](LICENSE) file for full terms.
 
 **Email Support:**
 - Developer: nitesh.kumar4work@gmail.com
-- Response time: 1-48 hours
+- Response time: 1-12 hours
 
 ### Connect
 
 **Developer:**
 - **Name:** Nitesh Kumar
 - **GitHub:** [@daemon-001](https://github.com/daemon-001)
-- **LinkedIn:** [daemon001](https://www.linkedin.com/in/daemon001)
+- **LinkedIn:** [@daemon001](https://www.linkedin.com/in/daemon001)
 
 **Project:**
 - **Repository:** [Mark-VII](https://github.com/daemon-001/Mark-VII)
 - **Stars:** Give us a ⭐ if you find this useful!
 - **Forks:** Welcome - see [Contributing](#contributing) section
 
----
-
-## Acknowledgments
-
-### Technologies
-- **OpenRouter** - Unified API for 50+ AI models
-- **Google Firebase** - Cloud infrastructure and authentication
-- **Google MLKit** - On-device language identification
-- **Jetpack Compose** - Modern Android UI toolkit
-- **Material 3** - Google's design system
-
-### Open Source Libraries
-- Retrofit & OkHttp by Square
-- Lottie by Airbnb
-- iText PDF by iText Software
-- And all contributors to our dependencies
-
-### Community
-- Thanks to all contributors, testers, and users
-- Special thanks to early adopters who provided feedback
-- Inspired by the need for flexible, multi-provider AI access
-
----
-
-## Show Your Support
-
-If Mark VII helps you, please consider:
-- ⭐ **Star this repository** on GitHub
-- 🐛 **Report bugs** to help improve quality
-- 💡 **Suggest features** for future releases
-- 🔧 **Contribute code** via pull requests
-- 📢 **Share** with developers and AI enthusiasts
-- 📝 **Write reviews** on GitHub or social media
-
-Every contribution, no matter how small, helps make Mark VII better for everyone!
+*Every contribution, no matter how small, helps make Mark VII better for everyone!*
 
 ---
 
@@ -863,12 +675,12 @@ Every contribution, no matter how small, helps make Mark VII better for everyone
 
 **Built with ❤️ by Nitesh**
 
-[⬆ Back to Top](#mark-vii)
+[⬆ Back to Top ⬆](#mark-vii)
 
-</div>
+---
 
 [Home](https://github.com/daemon-001/Mark-VII) • [Download](https://github.com/daemon-001/Mark-VII/releases) • [Report Bug](https://github.com/daemon-001/Mark-VII/issues) • [Request Feature](https://github.com/daemon-001/Mark-VII/issues)
 
-*Enjoy your advanced multi-provider AI chatbot experience!*
+*Enjoy your advanced multi-LLMs AI chatbot experience!*
 
 </div>

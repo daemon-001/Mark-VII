@@ -3,6 +3,21 @@
 All notable changes to the Mark VII project are documented in this file.
 
 ---
+## v3.2.0 (30200)
+February 9, 2026 14:30:00 +0530
+
+### User API Key Management
+- **Personal API Keys**: Introduced `UserApiPreferences` system allowing users to add and manage their own Gemini and OpenRouter API keys
+- **API Key Verification**: Added real-time API key verification with loading states, error handling, and visual feedback in Settings
+- **Key Priority System**: User-provided API keys now take priority over app default keys when enabled, with seamless fallback support
+- **Settings UI Enhancement**: New `UserApiConfigItem` component for API key input, toggle enable/disable, and verification
+- **Persistent Storage**: API keys and enabled states are stored securely using SharedPreferences with reactive StateFlow updates
+
+### Documentation & Visuals
+- **README Enhancement**: Added OpenRouter model visuals and comprehensive usage examples
+- **Documentation Assets**: Added 10 PNG visual assets for v3.1.0 feature documentation
+
+---
 ## v3.1.0 (30100) 
 December 7, 2025 05:20:00 +0530
 

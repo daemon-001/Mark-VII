@@ -154,7 +154,7 @@ fun InfoSetting() {
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "App Version: v3.1.0 (30100)",
+                        text = "App Version: v3.2.0 (30200)",
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
                         color = appColors.textSecondary,
