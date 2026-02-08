@@ -21,14 +21,14 @@ import csv
 # ============================================================================
 
 # Path to your Firebase service account key (download from Firebase Console)
-SERVICE_ACCOUNT_KEY = "mark-vii-firebase-service-account-key.json"
+SERVICE_ACCOUNT_KEY = "D:/Workspace/Project/Android-Studio/Mark-VII/update_models/mark-vii-firebase-service-account-key.json"
 
 # Your Firestore collection paths
 COLLECTION_PATH = "app_config"
 GEMINI_MODELS_DOCUMENT = "gemini_models"
 
 # Default CSV file name
-DEFAULT_CSV_FILE = "gemini_models.csv"
+DEFAULT_CSV_FILE = "D:/Workspace/Project/Android-Studio/Mark-VII/update_models/gemini_models.csv"
 
 # ============================================================================
 # FUNCTIONS
