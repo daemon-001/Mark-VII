@@ -15,7 +15,6 @@
 .cxx
 local.properties
 /#_resources_and_previous_builds
-FIREBASE_SETUP.md
 
 # Firebase
 app/google-services.json
