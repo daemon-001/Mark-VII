@@ -24,11 +24,18 @@ object ChatData {
     // API key loaded ONLY from Firebase - no local fallback
     var openrouter_api_key: String = ""
 
+    // Groq API key from user preferences
+    var groq_api_key: String = ""
+
     var selected_model = ""
     
     // Cache for free models so we do not re-fetch on view recreation
     var cachedFreeModels: List<ModelInfo> = emptyList()
     var cachedFreeModelsKey: String = ""
+
+    // Cache for Groq models
+    var cachedGroqModels: List<ModelInfo> = emptyList()
+    var cachedGroqModelsKey: String = ""
 
     /**
      * Update API key from Firebase
@@ -38,6 +45,13 @@ object ChatData {
         if (newKey.isNotEmpty()) {
             openrouter_api_key = newKey
             OpenRouterClient.updateApiKey(openrouter_api_key)
+        }
+    }
+
+    fun updateGroqApiKey(newKey: String) {
+        if (newKey.isNotEmpty()) {
+            groq_api_key = newKey
+            GroqClient.updateApiKey(groq_api_key)
         }
     }
     
@@ -134,6 +148,157 @@ object ChatData {
         cachedFreeModels = models
         cachedFreeModelsKey = cacheKey ?: ""
         return models
+    }
+
+    /**
+     * Fetch all available models from Groq
+     * Returns all active models as ModelInfo list
+     */
+    suspend fun fetchGroqModels(): List<ModelInfo> {
+        return try {
+            val response = withContext(Dispatchers.IO) {
+                GroqClient.api.getModels()
+            }
+            (response.data ?: emptyList())
+                .filter { it.active != false } // Include only active models
+                .map { model ->
+                    val cleanName = model.id
+                        .substringAfterLast("/")
+                        .split("-")
+                        .joinToString(" ") { part ->
+                            part.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+                        }
+                    ModelInfo(
+                        displayName = cleanName,
+                        apiModel = model.id,
+                        isAvailable = true
+                    )
+                }
+                .sortedBy { it.displayName }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    /**
+     * Get cached Groq models, or fetch them if not already loaded
+     */
+    suspend fun getOrFetchGroqModels(cacheKey: String? = null): List<ModelInfo> {
+        if (cachedGroqModels.isNotEmpty() && cacheKey != null && cacheKey == cachedGroqModelsKey) {
+            return cachedGroqModels
+        }
+        val models = fetchGroqModels()
+        cachedGroqModels = models
+        cachedGroqModelsKey = cacheKey ?: ""
+        return models
+    }
+
+    /**
+     * Get streaming response from Groq with conversation history
+     */
+    suspend fun getGroqStreamingResponse(
+        prompt: String,
+        conversationHistory: List<Chat> = emptyList(),
+        onChunk: (String) -> Unit
+    ): Chat = withContext(Dispatchers.IO) {
+        try {
+            if (groq_api_key.isEmpty()) {
+                throw Exception("API_KEY_MISSING|Groq API key is not configured. Please add your key in Settings.")
+            }
+
+            val modelToUse = when {
+                selected_model.isNotEmpty() -> selected_model
+                else -> "llama3-8b-8192" // Default Groq model
+            }
+
+            // Build messages array from conversation history
+            val messages = mutableListOf<Message>()
+            conversationHistory.takeLast(6).forEach { chat ->
+                messages.add(
+                    Message(
+                        role = if (chat.isFromUser) "user" else "assistant",
+                        content = listOf(Content(type = "text", text = chat.prompt))
+                    )
+                )
+            }
+            messages.add(
+                Message(
+                    role = "user",
+                    content = listOf(Content(type = "text", text = prompt))
+                )
+            )
+
+            val request = OpenRouterRequest(
+                model = modelToUse,
+                messages = messages,
+                max_tokens = 3000,
+                temperature = 0.7,
+                stream = true
+            )
+
+            val responseBody = GroqClient.api.chatCompletionStream(request)
+            val fullResponse = StringBuilder()
+
+            try {
+                responseBody.byteStream().bufferedReader().use { reader ->
+                    reader.lineSequence().forEach { line ->
+                        if (line.startsWith("data: ")) {
+                            val data = line.substring(6)
+                            if (data == "[DONE]") return@forEach
+                            try {
+                                val json = com.google.gson.Gson().fromJson(data, com.google.gson.JsonObject::class.java)
+                                val delta = json.getAsJsonArray("choices")
+                                    ?.get(0)?.asJsonObject
+                                    ?.getAsJsonObject("delta")
+                                    ?.get("content")?.asString
+                                if (delta != null) {
+                                    fullResponse.append(delta)
+                                    withContext(Dispatchers.Main) {
+                                        onChunk(delta)
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                // Skip malformed chunks
+                            }
+                        }
+                    }
+                }
+            } catch (e: java.io.IOException) {
+                if (fullResponse.isNotEmpty()) {
+                    return@withContext Chat(
+                        prompt = fullResponse.toString(),
+                        bitmap = null,
+                        isFromUser = false,
+                        modelUsed = modelToUse
+                    )
+                }
+                throw Exception("NETWORK_ERROR|Connection interrupted: ${e.message ?: "Network error"}")
+            }
+
+            return@withContext Chat(
+                prompt = fullResponse.toString(),
+                bitmap = null,
+                isFromUser = false,
+                modelUsed = modelToUse
+            )
+
+        } catch (e: Exception) {
+            if (e.message?.contains("|") == true) throw e
+            val errorMessage = when {
+                e is retrofit2.HttpException -> when (e.code()) {
+                    401 -> "UNAUTHORIZED|Invalid Groq API key. Check your key in Settings."
+                    429 -> "RATE_LIMITED|Too many requests. Please wait and retry."
+                    503 -> "NO_PROVIDER|Groq service is currently unavailable."
+                    else -> "HTTP_ERROR|Error ${e.code()}: ${e.message()}"
+                }
+                e is java.net.SocketTimeoutException -> "TIMEOUT|Request timed out. Check your connection."
+                e is java.net.UnknownHostException -> "NO_INTERNET|No internet connection available."
+                e is java.net.ConnectException -> "CONNECTION_FAILED|Could not connect to Groq."
+                e is java.io.IOException -> "NETWORK_ERROR|Network error: ${e.message}"
+                else -> "UNKNOWN_ERROR|${e.message ?: "An unexpected error occurred"}"
+            }
+            throw Exception(errorMessage)
+        }
     }
     
     /**

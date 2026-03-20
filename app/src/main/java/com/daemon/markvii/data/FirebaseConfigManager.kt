@@ -35,6 +35,9 @@ object FirebaseConfigManager {
     
     private val _geminiApiKey = MutableStateFlow<String>("")
     val geminiApiKey: StateFlow<String> = _geminiApiKey.asStateFlow()
+
+    private val _groqApiKey = MutableStateFlow<String>("")
+    val groqApiKey: StateFlow<String> = _groqApiKey.asStateFlow()
     
     // Exception models that require ":free" postfix - stored as map of modelId to modelName
     private val _exceptionModels = MutableStateFlow<Map<String, String>>(emptyMap())
@@ -163,9 +166,11 @@ object FirebaseConfigManager {
             if (document.exists()) {
                 val openrouterKey = document.getString("openrouterApiKey") ?: ""
                 val geminiKey = document.getString("geminiApiKey") ?: ""
+                val groqKey = document.getString("groqApiKey") ?: ""
                 _apiKey.value = openrouterKey
                 _geminiApiKey.value = geminiKey
-                Log.d(TAG, "API keys loaded from Firebase (OpenRouter + Gemini)")
+                _groqApiKey.value = groqKey
+                Log.d(TAG, "API keys loaded from Firebase (OpenRouter + Gemini + Groq)")
             } else {
                 Log.w(TAG, "API keys document not found, using default")
                 loadDefaultApiKey()

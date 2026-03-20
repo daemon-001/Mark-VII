@@ -15,6 +15,8 @@ object UserApiPreferences {
     private const val KEY_GEMINI_ENABLED = "gemini_enabled"
     private const val KEY_OPENROUTER_API_KEY = "openrouter_api_key"
     private const val KEY_OPENROUTER_ENABLED = "openrouter_enabled"
+    private const val KEY_GROQ_API_KEY = "groq_api_key"
+    private const val KEY_GROQ_ENABLED = "groq_enabled"
     
     private lateinit var prefs: SharedPreferences
     
@@ -31,6 +33,13 @@ object UserApiPreferences {
     
     private val _isOpenRouterKeyEnabled = MutableStateFlow(false)
     val isOpenRouterKeyEnabled: StateFlow<Boolean> = _isOpenRouterKeyEnabled.asStateFlow()
+
+    // Groq Config
+    private val _groqApiKey = MutableStateFlow("")
+    val groqApiKey: StateFlow<String> = _groqApiKey.asStateFlow()
+
+    private val _isGroqKeyEnabled = MutableStateFlow(false)
+    val isGroqKeyEnabled: StateFlow<Boolean> = _isGroqKeyEnabled.asStateFlow()
     
     fun init(context: Context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -41,6 +50,9 @@ object UserApiPreferences {
         
         _openRouterApiKey.value = prefs.getString(KEY_OPENROUTER_API_KEY, "") ?: ""
         _isOpenRouterKeyEnabled.value = prefs.getBoolean(KEY_OPENROUTER_ENABLED, false)
+
+        _groqApiKey.value = prefs.getString(KEY_GROQ_API_KEY, "") ?: ""
+        _isGroqKeyEnabled.value = prefs.getBoolean(KEY_GROQ_ENABLED, false)
     }
     
     fun setGeminiApiKey(key: String) {
@@ -62,4 +74,15 @@ object UserApiPreferences {
         _isOpenRouterKeyEnabled.value = enabled
         prefs.edit().putBoolean(KEY_OPENROUTER_ENABLED, enabled).apply()
     }
+
+    fun setGroqApiKey(key: String) {
+        _groqApiKey.value = key
+        prefs.edit().putString(KEY_GROQ_API_KEY, key).apply()
+    }
+
+    fun setGroqKeyEnabled(enabled: Boolean) {
+        _isGroqKeyEnabled.value = enabled
+        prefs.edit().putBoolean(KEY_GROQ_ENABLED, enabled).apply()
+    }
 }
+

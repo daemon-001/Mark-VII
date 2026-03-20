@@ -420,6 +420,64 @@ class ChatViewModel : ViewModel() {
                         }
                         saveChatHistory()
                     }
+
+                    ApiProvider.GROQ -> {
+                        // Use Groq API with streaming
+                        val streamingChat = Chat(
+                            prompt = "",
+                            bitmap = null,
+                            isFromUser = false,
+                            modelUsed = ChatData.selected_model,
+                            isStreaming = true
+                        )
+
+                        _chatState.update {
+                            it.copy(
+                                chatList = it.chatList.toMutableList().apply {
+                                    add(0, streamingChat)
+                                }
+                            )
+                        }
+
+                        val historySource = _chatState.value.chatList.drop(1)
+                        val historyFiltered = if (isRetry && historySource.isNotEmpty() && !historySource[0].isFromUser) {
+                            historySource.drop(1)
+                        } else {
+                            historySource
+                        }
+                        val conversationHistory = historyFiltered
+                            .filter { !it.isStreaming }
+                            .reversed()
+
+                        val chat = ChatData.getGroqStreamingResponse(
+                            prompt = prompt,
+                            conversationHistory = conversationHistory
+                        ) { chunk ->
+                            _chatState.update { state ->
+                                val updatedList = state.chatList.toMutableList()
+                                if (updatedList.isNotEmpty()) {
+                                    val currentResponse = updatedList[0]
+                                    updatedList[0] = currentResponse.copy(
+                                        prompt = currentResponse.prompt + chunk,
+                                        isStreaming = true
+                                    )
+                                }
+                                state.copy(chatList = updatedList)
+                            }
+                        }
+
+                        _chatState.update { state ->
+                            val updatedList = state.chatList.toMutableList()
+                            if (updatedList.isNotEmpty()) {
+                                updatedList[0] = chat.copy(isStreaming = false)
+                            }
+                            state.copy(
+                                chatList = updatedList,
+                                isGeneratingResponse = false
+                            )
+                        }
+                        saveChatHistory()
+                    }
                 }
             } catch (e: Exception) {
                 // Remove the placeholder chat on error
@@ -472,6 +530,10 @@ class ChatViewModel : ViewModel() {
                     }
                     ApiProvider.OPENROUTER -> {
                         // OpenRouter no longer supports image processing
+                        throw Exception("IMAGE_NOT_SUPPORTED|Image processing is only available with Gemini API. Please switch to Gemini to use this feature.")
+                    }
+                    ApiProvider.GROQ -> {
+                        // Groq does not support image processing
                         throw Exception("IMAGE_NOT_SUPPORTED|Image processing is only available with Gemini API. Please switch to Gemini to use this feature.")
                     }
                 }

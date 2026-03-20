@@ -98,11 +98,13 @@ fun ChatScreen(
     var isLoadingModels by remember { mutableStateOf(ChatData.cachedFreeModels.isEmpty()) }
     var freeModels by remember { mutableStateOf<List<ModelInfo>>(ChatData.cachedFreeModels) }
     var modelsLoadError by remember { mutableStateOf<String?>(null) }
+    var groqModels by remember { mutableStateOf<List<ModelInfo>>(ChatData.cachedGroqModels) }
     val appColors = LocalAppColors.current // Get theme colors for outer scope
     
     // Observe Firebase API keys and Gemini models
     val firebaseApiKey by FirebaseConfigManager.apiKey.collectAsState()
     val geminiApiKey by FirebaseConfigManager.geminiApiKey.collectAsState()
+    val firebaseGroqApiKey by FirebaseConfigManager.groqApiKey.collectAsState()
     val firebaseGeminiModels by FirebaseConfigManager.geminiModels.collectAsState()
     
     // Convert Firebase Gemini models to ModelInfo
@@ -134,6 +136,9 @@ fun ChatScreen(
     val userOpenRouterKey by com.daemon.markvii.data.UserApiPreferences.openRouterApiKey.collectAsState()
     val isUserOpenRouterEnabled by com.daemon.markvii.data.UserApiPreferences.isOpenRouterKeyEnabled.collectAsState()
 
+    val userGroqKey by com.daemon.markvii.data.UserApiPreferences.groqApiKey.collectAsState()
+    val isUserGroqEnabled by com.daemon.markvii.data.UserApiPreferences.isGroqKeyEnabled.collectAsState()
+
     // Update API keys - Prioritize User Keys
     LaunchedEffect(firebaseApiKey, userOpenRouterKey, isUserOpenRouterEnabled) {
         val keyToUse = if (isUserOpenRouterEnabled && userOpenRouterKey.isNotBlank()) {
@@ -156,6 +161,18 @@ fun ChatScreen(
         
         if (keyToUse.isNotEmpty()) {
             com.daemon.markvii.data.GeminiClient.updateApiKey(keyToUse)
+        }
+    }
+
+    // Update Groq API key — user key overrides Firebase key
+    LaunchedEffect(firebaseGroqApiKey, userGroqKey, isUserGroqEnabled) {
+        val keyToUse = if (isUserGroqEnabled && userGroqKey.isNotBlank()) {
+            userGroqKey
+        } else {
+            firebaseGroqApiKey
+        }
+        if (keyToUse.isNotEmpty()) {
+            ChatData.updateGroqApiKey(keyToUse)
         }
     }
     
@@ -186,6 +203,23 @@ fun ChatScreen(
                     modelsLoadError = "Failed to load models: ${e.message}"
                 } finally {
                     isLoadingModels = false
+                }
+            }
+        }
+    }
+
+    // Load Groq models when Groq key changes (Firebase or user override)
+    LaunchedEffect(firebaseGroqApiKey, userGroqKey, isUserGroqEnabled) {
+        val keyToUse = if (isUserGroqEnabled && userGroqKey.isNotBlank()) userGroqKey else firebaseGroqApiKey
+        if (keyToUse.isNotBlank()) {
+            val cacheKey = keyToUse
+            if (ChatData.cachedGroqModels.isNotEmpty() && ChatData.cachedGroqModelsKey == cacheKey) {
+                groqModels = ChatData.cachedGroqModels
+            } else {
+                try {
+                    groqModels = ChatData.getOrFetchGroqModels(cacheKey)
+                } catch (e: Exception) {
+                    groqModels = emptyList()
                 }
             }
         }
@@ -244,6 +278,7 @@ fun ChatScreen(
     val currentModels = when (currentApiProvider) {
         ApiProvider.OPENROUTER -> freeModels
         ApiProvider.GEMINI -> geminiModels
+        ApiProvider.GROQ -> groqModels
     }
     
     // Reset model selection when API provider changes
@@ -620,7 +655,7 @@ fun ChatScreen(
                                 
                                 Box(
                                     modifier = Modifier
-                                        .width(280.dp)
+                                        .width(320.dp)
                                         .graphicsLayer {
                                             scaleX = dropdownScale
                                             scaleY = dropdownScale
@@ -644,7 +679,7 @@ fun ChatScreen(
                                         expanded = isPromptDropDownExpanded.value,
                                         onDismissRequest = { isPromptDropDownExpanded.value = false },
                                         modifier = Modifier
-                                            .width(280.dp)
+                                            .width(320.dp)
                                             .heightIn(max = 450.dp)
                                             .background(MaterialTheme.colorScheme.surface),
                                         shape = RoundedCornerShape(20.dp),
@@ -661,7 +696,7 @@ fun ChatScreen(
                                                 horizontalArrangement = Arrangement.SpaceBetween,
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                // Gemini button (now on the left)
+                                                // Gemini button
                                                 Box(
                                                     modifier = Modifier
                                                         .weight(1f)
@@ -686,7 +721,7 @@ fun ChatScreen(
                                                             appColors.accent
                                                         else
                                                             appColors.textSecondary,
-                                                        fontSize = 13.sp,
+                                                        fontSize = 11.sp,
                                                         fontWeight = if (currentApiProvider == ApiProvider.GEMINI)
                                                             FontWeight.SemiBold
                                                         else
@@ -696,7 +731,7 @@ fun ChatScreen(
                                                 
                                                 Spacer(modifier = Modifier.width(8.dp))
                                                 
-                                                // OpenRouter button (now on the right)
+                                                // OpenRouter button
                                                 Box(
                                                     modifier = Modifier
                                                         .weight(1f)
@@ -721,8 +756,43 @@ fun ChatScreen(
                                                             appColors.accent
                                                         else
                                                             appColors.textSecondary,
-                                                        fontSize = 13.sp,
+                                                        fontSize = 11.sp,
                                                         fontWeight = if (currentApiProvider == ApiProvider.OPENROUTER)
+                                                            FontWeight.SemiBold
+                                                        else
+                                                            FontWeight.Normal
+                                                    )
+                                                }
+
+                                                Spacer(modifier = Modifier.width(8.dp))
+
+                                                // Groq button
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .clip(RoundedCornerShape(10.dp))
+                                                        .background(
+                                                            if (currentApiProvider == ApiProvider.GROQ)
+                                                                appColors.accent.copy(alpha = 0.2f)
+                                                            else
+                                                                appColors.surfaceTertiary
+                                                        )
+                                                        .clickable {
+                                                            chaViewModel.onEvent(
+                                                                ChatUiEvent.SwitchApiProvider(ApiProvider.GROQ)
+                                                            )
+                                                        }
+                                                        .padding(vertical = 8.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = "Groq",
+                                                        color = if (currentApiProvider == ApiProvider.GROQ)
+                                                            appColors.accent
+                                                        else
+                                                            appColors.textSecondary,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = if (currentApiProvider == ApiProvider.GROQ)
                                                             FontWeight.SemiBold
                                                         else
                                                             FontWeight.Normal

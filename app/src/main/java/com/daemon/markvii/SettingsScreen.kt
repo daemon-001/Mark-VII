@@ -169,6 +169,8 @@ fun SettingsScreen(
             val isGeminiEnabled by com.daemon.markvii.data.UserApiPreferences.isGeminiKeyEnabled.collectAsState()
             val openRouterKey by com.daemon.markvii.data.UserApiPreferences.openRouterApiKey.collectAsState()
             val isOpenRouterEnabled by com.daemon.markvii.data.UserApiPreferences.isOpenRouterKeyEnabled.collectAsState()
+            val groqKey by com.daemon.markvii.data.UserApiPreferences.groqApiKey.collectAsState()
+            val isGroqEnabled by com.daemon.markvii.data.UserApiPreferences.isGroqKeyEnabled.collectAsState()
             val context = androidx.compose.ui.platform.LocalContext.current
             
             Column(
@@ -195,6 +197,18 @@ fun SettingsScreen(
                     onKeyChanged = { com.daemon.markvii.data.UserApiPreferences.setOpenRouterApiKey(it) },
                     onEnabledChanged = { com.daemon.markvii.data.UserApiPreferences.setOpenRouterKeyEnabled(it) },
                     onVerify = { key -> com.daemon.markvii.data.OpenRouterClient.verifyKey(key) },
+                    appColors = appColors
+                )
+
+                // Groq API Config
+                UserApiConfigItem(
+                    title = "Groq API Key",
+                    apiKey = groqKey,
+                    isEnabled = isGroqEnabled,
+                    getKeyUrl = "https://console.groq.com/keys",
+                    onKeyChanged = { com.daemon.markvii.data.UserApiPreferences.setGroqApiKey(it) },
+                    onEnabledChanged = { com.daemon.markvii.data.UserApiPreferences.setGroqKeyEnabled(it) },
+                    onVerify = { key -> com.daemon.markvii.data.GroqClient.verifyKey(key) },
                     appColors = appColors
                 )
             }

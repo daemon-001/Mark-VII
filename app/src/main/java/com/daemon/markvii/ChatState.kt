@@ -10,7 +10,8 @@ import com.daemon.markvii.data.ErrorInfo
 
 enum class ApiProvider {
     OPENROUTER,
-    GEMINI
+    GEMINI,
+    GROQ
 }
 
 data class ChatState (
