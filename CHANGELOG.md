@@ -3,6 +3,28 @@
 All notable changes to the Mark VII project are documented in this file.
 
 ---
+## v3.3.0 (30300)
+March 20, 2026 15:20:00 +0530
+
+### Groq — Third AI Provider
+- **Groq Integration**: Added Groq as a third AI provider alongside OpenRouter and Gemini, giving access to ultra-fast inference models (Llama 3, Mixtral 8x7B, Gemma 2, and more)
+- **New `GroqApi.kt`**: OpenAI-compatible Retrofit client (`api.groq.com/openai/v1/`) with streaming SSE support, model listing, and `verifyKey()` helper
+- **Dynamic Model Fetching**: All active Groq models fetched live from the Groq `/models` endpoint and cached — no hardcoded list required
+- **Firestore Key Management**: Groq API key read from `app_config/api_keys` document (field: `groqApiKey`) following the same Firebase-first pattern as OpenRouter and Gemini
+- **User Key Override**: Personal Groq API key can be entered in Settings → Groq API Key; takes priority over the Firebase key when enabled
+- **Streaming Responses**: Full SSE streaming for Groq chat completions with conversation history context (last 6 messages)
+- **`ApiProvider.GROQ`**: Added to the `ApiProvider` enum; `ChatViewModel` routes requests to the Groq client; image uploads correctly return an unsupported-provider error
+- **`UserApiPreferences`**: Added `groqApiKey` and `isGroqKeyEnabled` fields with SharedPreferences persistence and `StateFlow` reactivity
+
+### Model Selector UI
+- **Groq Tab**: Added "Groq" provider button to the model-selector dropdown alongside existing Gemini and OpenRouter tabs
+- **Wider Dropdown**: Increased model selector dropdown width from 280dp to 320dp to comfortably fit all three provider tabs
+- **Compact Tab Labels**: Reduced provider tab font size from 13sp to 11sp to prevent "OpenRouter" text from appearing cramped
+
+### Settings
+- **Groq API Key Card**: New `UserApiConfigItem` for Groq in the Settings screen with verify button, toggle, and link to [console.groq.com/keys](https://console.groq.com/keys)
+
+---
 ## v3.2.0 (30200)
 February 9, 2026 14:30:00 +0530
 

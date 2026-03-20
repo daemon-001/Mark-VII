@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-3.2.0-blue.svg)
+![Version](https://img.shields.io/badge/version-3.3.0-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Android-green.svg)
 ![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
@@ -21,10 +21,10 @@
 
 ### Key Capabilities
 
-- 🤖 **45+ AI Models** - Gemini, GPT, Llama, Deepseek, Mistral, and more
+- 🤖 **45+ AI Models** - Gemini, GPT, Llama, Deepseek, Mistral, Groq-hosted models, and more
 - 🔥 **Cloud-First Architecture** - Firebase-powered configuration management and real-time sync
 - ⚡ **High Performance** - <100ms startup, connection pooling, optimized streaming
-- 🔗 **Dual API Support** - OpenRouter (40+ models) + Direct Gemini API
+- 🔗 **Triple API Support** - OpenRouter (40+ models) + Direct Gemini API + Groq (ultra-fast inference)
 - 📱 **Modern Material 3 UI** - Dynamic theming, smooth animations, haptic feedback
 - 🌐 **Multilingual TTS** - Automatic language detection for 15+ languages
 - 🔒 **Enterprise Security** - Firebase Authentication, encrypted storage, HTTPS only
@@ -52,10 +52,11 @@
 
 ### 🤖 AI Model Access
 
-**Dual API Architecture:**
+**Triple API Architecture:**
 - **OpenRouter Integration** - Direct access to 100+ models with real-time catalog sync
 - **Gemini API Integration** - Native Google Gemini support with vision capabilities
-- **Seamless Switching** - Toggle between APIs mid-conversation
+- **Groq Integration** - Ultra-fast inference API with all available Groq-hosted models
+- **Seamless Switching** - Toggle between all three APIs mid-conversation
 
 **Supported Companies:**
 - **Google** - Gemini 2.0/2.5 Flash/Pro, Gemma 2/3
@@ -64,6 +65,7 @@
 - **Meta** - Llama 3.1/3.3/4 (8B to 405B parameters)
 - **Deepseek** - Chat V3.1, R1, R1 Distill variants
 - **Mistral AI** - Full lineup from Small to Large
+- **Groq** - Llama 3 (8B/70B), Mixtral 8x7B, Gemma 2, Whisper (via Groq's ultra-fast inference)
 - **Qwen (Alibaba)** - Qwen2.5, Qwen3 Coder
 - **xAI** - Grok with vision support
 - **30+ more** - Cohere, AI21, Perplexity, and others
@@ -171,6 +173,7 @@ anthropic/claude-3-5-sonnet-20241022,Claude 3.5 Sonnet,TRUE,3
 - Firebase account (free tier sufficient)
 - OpenRouter API key (free tier available at [openrouter.ai/keys](https://openrouter.ai/keys))
 - Optional: Google Gemini API key for direct Gemini access
+- Optional: Groq API key for Groq inference ([console.groq.com/keys](https://console.groq.com/keys))
 
 ### 1. Clone Repository
 ```bash
@@ -228,6 +231,7 @@ python update_firebase_models.py --csv models.csv
 5. Add fields:
    - `openrouterApiKey` (string) - Get from [OpenRouter](https://openrouter.ai/keys)
    - `geminiApiKey` (string, optional) - Get from [Google AI Studio](https://makersuite.google.com/app/apikey)
+   - `groqApiKey` (string, optional) - Get from [Groq Console](https://console.groq.com/keys)
 
 ### 3. Build & Run
 ```bash
@@ -275,6 +279,11 @@ See [Quick Start](#quick-start) above for source-based setup.
 - Ensure `google-services.json` is in `app/` folder
 - Check `exp_models` collection for exception models
 
+#### Groq API Issues
+- Ensure `groqApiKey` field is present in `app_config/api_keys` Firestore document
+- Or add your personal key in Settings → Groq API Key → Verify → Enable
+- Get a free key from [console.groq.com/keys](https://console.groq.com/keys)
+
 #### HTTP 401 Error (Unauthorized)
 - Invalid API key
 - Get new key from [OpenRouter](https://openrouter.ai/keys)
@@ -314,7 +323,7 @@ See [Quick Start](#quick-start) above for source-based setup.
 
 ### Overview
 
-**Mark VII** uses a cloud-first architecture combining Firebase's real-time configuration management with dual AI API access (OpenRouter + Gemini), enabling zero-downtime model updates and enterprise-grade reliability.
+**Mark VII** uses a cloud-first architecture combining Firebase's real-time configuration management with triple AI API access (OpenRouter + Gemini + Groq), enabling zero-downtime model updates and enterprise-grade reliability.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -342,13 +351,13 @@ See [Quick Start](#quick-start) above for source-based setup.
 │  └─ Connection Pool         - Persistent connections        │
 └─────────────────────────────────────────────────────────────┘
               ↓                              ↓
-    ┌───────────────────┐        ┌──────────────────────┐
-    │ Firebase Services │        │   AI API Providers   │
-    ├───────────────────┤        ├──────────────────────┤
-    │ Firestore         │        │ OpenRouter API       │
-    │ Authentication    │        │ (100+ models)        │
-    │ Analytics         │        │ + Direct Gemini API  │
-    └───────────────────┘        └──────────────────────┘
+    ┌───────────────────┐        ┌──────────────────────────┐
+    │ Firebase Services │        │   AI API Providers       │
+    ├───────────────────┤        ├──────────────────────────┤
+    │ Firestore         │        │ OpenRouter (100+ models)  │
+    │ Authentication    │        │ Direct Gemini API         │
+    │ Analytics         │        │ Groq (ultra-fast)         │
+    └───────────────────┘        └──────────────────────────┘
 ```
 
 ### Tech Stack
@@ -377,6 +386,7 @@ See [Quick Start](#quick-start) above for source-based setup.
 **AI Providers:**
 - OpenRouter API: 100+ models with unified interface
 - Direct Gemini API: Native Google integration with vision
+- Groq API: OpenAI-compatible, ultra-fast inference (Llama 3, Mixtral, Gemma)
 - MLKit Language ID: Automatic TTS language detection
 
 **Tools:**
@@ -394,14 +404,16 @@ Mark-VII/
 │       ├── ChatViewModel.kt               # MVVM state management
 │       ├── data/
 │       │   ├── Chat.kt                    # Data models (Message, ChatRequest, etc.)
-│       │   ├── ChatData.kt                # OpenRouter API orchestration
+│       │   ├── ChatData.kt                # API orchestration (OpenRouter + Groq)
 │       │   ├── GeminiClient.kt            # Direct Gemini API client
-│       │   ├── OpenRouterApi.kt           # Retrofit API interface
+│       │   ├── OpenRouterApi.kt           # OpenRouter Retrofit interface + client
+│       │   ├── GroqApi.kt                 # Groq Retrofit interface + client
 │       │   ├── FirebaseConfig.kt          # Model configuration models
 │       │   ├── FirebaseConfigManager.kt   # Firestore config operations
 │       │   ├── AuthManager.kt             # Google Sign-In + token management
 │       │   ├── ChatHistoryManager.kt      # Cloud chat session storage
 │       │   ├── ThemePreferences.kt        # Local theme persistence
+│       │   ├── UserApiPreferences.kt      # User API key storage (Gemini/OR/Groq)
 │       │   └── Keys.kt                    # App metadata + build info
 │       ├── ui/theme/
 │       │   ├── Theme.kt                   # Material 3 theme + AppColors
@@ -501,7 +513,7 @@ Mark-VII/
 
 ## Performance
 
-### Current Metrics (v3.2.0)
+### Current Metrics (v3.3.0)
 
 **Startup Performance:**
 - **Cold Start:** <100ms (24x faster than v1.x)
@@ -520,15 +532,15 @@ Mark-VII/
 
 ### Version Comparison
 
-| Metric                | v1.x (Gemini)      | v2.x (OpenRouter)  | v3.0+ (Dual API)   | Improvement      |
+| Metric                | v1.x (Gemini)      | v2.x (OpenRouter)  | v3.0+ (Dual API)   | v3.3 (Triple API)  |
 |-----------------------|--------------------|--------------------|--------------------|--------------------|
-| **Startup Time**      | ~2.65s             | ~110ms             | <100ms             | **26.5x faster**   |
-| **Models Available**  | 5-10               | 100+               | 100+ (dual APIs)   | **10-20x more**    |
-| **API Providers**     | 1 (Google)         | Multiple           | OpenRouter + Gemini| **Direct + unified**|
+| **Startup Time**      | ~2.65s             | ~110ms             | <100ms             | <100ms             |
+| **Models Available**  | 5-10               | 100+               | 100+ (dual APIs)   | 100++ (three APIs) |
+| **API Providers**     | 1 (Google)         | Multiple           | OpenRouter + Gemini| + Groq             |
 | **Configuration**     | Hardcoded          | Cloud-based        | Cloud + real-time  | **Instant updates**|
-| **Streaming**         | No                 | Yes (SSE)          | Yes (both APIs)    | **Real-time**      |
+| **Streaming**         | No                 | Yes (SSE)          | Yes (both APIs)    | Yes (all APIs)     |
 | **Error Handling**    | Basic              | Comprehensive      | Auto-retry + 404 fix| **Resilient**     |
-| **TTS Languages**     | 1-2                | 1-2                | 15+ (MLKit)        | **7x more**        |
+| **TTS Languages**     | 1-2                | 1-2                | 15+ (MLKit)        | 15+ (MLKit)        |
 | **Theme Support**     | Basic              | Light/Dark         | L/D/System + iOS-style | **Polished**   |
 | **Offline Support**   | No                 | Limited            | Cached config      | **Works offline**  |
 | **Stop Generation**   | No                 | Yes                | Yes + haptics      | **User control**   |
