@@ -555,17 +555,17 @@ object ChatData {
             }
             
             // Add current prompt as the latest user message
-            messages.add(
-                Message(
-                    role = "user",
-                    content = listOf(
-                        Content(
-                            type = "text",
-                            text = prompt
-                        )
-                    )
-                )
-            )
+//            messages.add(
+//                Message(
+//                    role = "user",
+//                    content = listOf(
+//                        Content(
+//                            type = "text",
+//                            text = prompt
+//                        )
+//                    )
+//                )
+//            )
             
             val request = OpenRouterRequest(
                 model = modelToUse,
