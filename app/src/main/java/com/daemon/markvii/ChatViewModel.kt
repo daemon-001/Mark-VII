@@ -78,15 +78,21 @@ class ChatViewModel : ViewModel() {
             }
             
             is ChatUiEvent.RetryPrompt -> {
-                // Retry without adding prompt to chat again
                 if (event.prompt.isNotEmpty()) {
-                    // Set generating state immediately for instant UI feedback
                     _chatState.update { it.copy(isGeneratingResponse = true) }
+                    
+                    // Truncate: drop the old AI response and everything after it (newer messages).
+                    // chatList is reversed (index 0 = newest), so drop items 0..modelResponseIndex.
+                    // This leaves history up to the user message that originally triggered this response.
+                    _chatState.update { state ->
+                        val trimmed = state.chatList.drop(event.modelResponseIndex + 1).toMutableList()
+                        state.copy(chatList = trimmed)
+                    }
                     
                     if (event.bitmap != null) {
                         getResponseWithImage(event.prompt, event.bitmap)
                     } else {
-                        getResponse(event.prompt, isRetry = true)
+                        getResponse(event.prompt, isRetry = false)
                     }
                 }
             }
@@ -267,6 +273,7 @@ class ChatViewModel : ViewModel() {
 
     private fun getResponse(prompt: String, isRetry: Boolean = false) {
         streamingJob = viewModelScope.launch {
+            var lastEmitMs = 0L
             try {
                 // Determine which API to use
                 val currentProvider = _chatState.value.currentApiProvider
@@ -310,19 +317,20 @@ class ChatViewModel : ViewModel() {
                             modelName = ChatData.selected_model,
                             conversationHistory = conversationHistory,
                             onChunk = { chunk ->
-                                _chatState.update { state ->
-                                    val updatedList = state.chatList.toMutableList()
-                                    if (updatedList.isNotEmpty()) {
-                                        val currentResponse = updatedList[0]
-                                        updatedList[0] = currentResponse.copy(
-                                            prompt = currentResponse.prompt + chunk,
-                                            isStreaming = true
-                                        )
+                                val now = System.currentTimeMillis()
+                                if (now - lastEmitMs >= 16L) {
+                                    lastEmitMs = now
+                                    _chatState.update { state ->
+                                        val updatedList = state.chatList.toMutableList()
+                                        if (updatedList.isNotEmpty()) {
+                                            val currentResponse = updatedList[0]
+                                            updatedList[0] = currentResponse.copy(
+                                                prompt = currentResponse.prompt + chunk,
+                                                isStreaming = true
+                                            )
+                                        }
+                                        state.copy(chatList = updatedList)
                                     }
-                                    state.copy(
-                                        chatList = updatedList,
-                                        hapticTrigger = System.currentTimeMillis() // Trigger haptic on chunk
-                                    )
                                 }
                             },
                             onFinish = { finishReason ->
@@ -386,25 +394,24 @@ class ChatViewModel : ViewModel() {
                             .filter { !it.isStreaming } // Skip any other streaming messages
                             .reversed() // Reverse to chronological order
                         
-                        var chunkCount = 0
                         val chat = ChatData.getStreamingResponse(
                             prompt = prompt,
                             conversationHistory = conversationHistory
                         ) { chunk ->
-                            chunkCount++
-                            _chatState.update { state ->
-                                val updatedList = state.chatList.toMutableList()
-                                if (updatedList.isNotEmpty()) {
-                                    val currentResponse = updatedList[0]
-                                    updatedList[0] = currentResponse.copy(
-                                        prompt = currentResponse.prompt + chunk,
-                                        isStreaming = true
-                                    )
+                            val now = System.currentTimeMillis()
+                            if (now - lastEmitMs >= 16L) {
+                                lastEmitMs = now
+                                _chatState.update { state ->
+                                    val updatedList = state.chatList.toMutableList()
+                                    if (updatedList.isNotEmpty()) {
+                                        val currentResponse = updatedList[0]
+                                        updatedList[0] = currentResponse.copy(
+                                            prompt = currentResponse.prompt + chunk,
+                                            isStreaming = true
+                                        )
+                                    }
+                                    state.copy(chatList = updatedList)
                                 }
-                                state.copy(
-                                    chatList = updatedList
-                                    // Haptics will be handled by typewriter animation in UI
-                                )
                             }
                         }
                         
@@ -453,16 +460,20 @@ class ChatViewModel : ViewModel() {
                             prompt = prompt,
                             conversationHistory = conversationHistory
                         ) { chunk ->
-                            _chatState.update { state ->
-                                val updatedList = state.chatList.toMutableList()
-                                if (updatedList.isNotEmpty()) {
-                                    val currentResponse = updatedList[0]
-                                    updatedList[0] = currentResponse.copy(
-                                        prompt = currentResponse.prompt + chunk,
-                                        isStreaming = true
-                                    )
+                            val now = System.currentTimeMillis()
+                            if (now - lastEmitMs >= 16L) {
+                                lastEmitMs = now
+                                _chatState.update { state ->
+                                    val updatedList = state.chatList.toMutableList()
+                                    if (updatedList.isNotEmpty()) {
+                                        val currentResponse = updatedList[0]
+                                        updatedList[0] = currentResponse.copy(
+                                            prompt = currentResponse.prompt + chunk,
+                                            isStreaming = true
+                                        )
+                                    }
+                                    state.copy(chatList = updatedList)
                                 }
-                                state.copy(chatList = updatedList)
                             }
                         }
 

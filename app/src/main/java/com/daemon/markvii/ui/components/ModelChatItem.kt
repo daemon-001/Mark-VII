@@ -65,66 +65,50 @@ fun ModelChatItem(
     var selectedApiProvider by remember { mutableStateOf(currentApiProvider) }
     
     // Unified Smooth Streaming Engine
-    // Decouples network chunks from visual display for consistent premium feel
-    
-    // Display buffer - what the user sees
     var displayedText by remember { mutableStateOf("") }
+    val currentResponse by rememberUpdatedState(response)
     
-    // Reset display when a new streaming session starts
     LaunchedEffect(isStreaming) {
         if (isStreaming) {
             displayedText = ""
-        } else if (response.isNotEmpty()) {
-            // Ensure final text is shown when streaming stops
-            displayedText = response
-        }
-    }
-    
-    // Stable reference to target text (network buffer)
-    val currentResponse by rememberUpdatedState(response)
-    
-    // Animation Loop
-    LaunchedEffect(isStreaming) {
-        if (isStreaming) {
+            var lastTargetLength = 0      // last seen network buffer length
+            var lastHapticMs = 0L         // debounce gate
             while (true) {
                 val target = currentResponse
                 val current = displayedText
-                
+
+                // Detect new chunk from server: network buffer grew since last tick
+                val targetGrew = target.length > lastTargetLength
+                if (targetGrew) {
+                    lastTargetLength = target.length
+                    val now = System.currentTimeMillis()
+                    if (now - lastHapticMs >= 50L) {
+                        // New server data arrived — fire haptic synced to this chunk
+                        hapticFeedback.performHapticFeedback(
+                            androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove
+                        )
+                        lastHapticMs = now
+                    }
+                }
+
                 if (current.length < target.length) {
                     val diff = target.length - current.length
-                    
-                    // Adaptive Speed Algorithm
-                    // Adjusts typing speed based on how far behind we are
                     val (charsToProcess, delayMs) = when {
-                        diff > 50 -> 5 to 5L    // Catch up fast (Gemini chunks)
-                        diff > 20 -> 2 to 10L   // Medium catch up
-                        diff > 5 -> 1 to 15L    // Slight lag, speed up a bit
-                        else -> 1 to 30L        // Natural typing speed
+                        diff > 50 -> 5 to 5L
+                        diff > 20 -> 2 to 10L
+                        diff > 5  -> 1 to 15L
+                        else      -> 1 to 30L
                     }
-                    
-                    // Update Display
                     val nextIndex = (current.length + charsToProcess).coerceAtMost(target.length)
-                    val newText = target.substring(0, nextIndex)
-                    displayedText = newText
-                    
-                    // Unified Haptics
-                    // Trigger every 3 characters of DISPLAYED text
-                    // This ensures sync regardless of network chunk size
-                    if (newText.length % 3 == 0) {
-                         hapticFeedback.performHapticFeedback(
-                             androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove
-                         )
-                    }
-                    
+                    displayedText = target.substring(0, nextIndex)
                     delay(delayMs)
                 } else {
-                    // Buffer empty, wait for more chunks
                     delay(50)
-                    
-                    // Break if streaming finished and we caught up
-                    if (!isStreaming && current.length == target.length) break
                 }
             }
+        } else if (response.isNotEmpty()) {
+            // Streaming stopped — ensure final text is shown
+            displayedText = response
         }
     }
     
@@ -161,79 +145,23 @@ fun ModelChatItem(
             ) {
                 Text(
                     text = headerText,
-                    fontSize = 18.sp,
+                    fontSize = 20.sp,
                     fontFamily = FontFamily(Font(R.font.typographica)),
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 if (modelUsed.isNotEmpty()) {
                     Text(
                         text = modelUsed.replace(":free", ""),
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         color = appColors.textSecondary,
                         modifier = Modifier.padding(top = 2.dp)
                     )
                 }
                 
-                // Show blinking cursor when streaming (moved below header)
-                if (isStreaming) {
-                    // Blinking cursor animation - only created when streaming
-                    val infiniteTransition = rememberInfiniteTransition(label = "cursor")
-                    val cursorAlpha by infiniteTransition.animateFloat(
-                        initialValue = 0.3f,
-                        targetValue = 1f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(
-                                durationMillis = 800,
-                                easing = FastOutSlowInEasing
-                            ),
-                            repeatMode = RepeatMode.Reverse
-                        ),
-                        label = "cursor_blink"
-                    )
-                    
-                    val cursorScale by infiniteTransition.animateFloat(
-                        initialValue = 0.95f,
-                        targetValue = 1.05f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(
-                                durationMillis = 800,
-                                easing = FastOutSlowInEasing
-                            ),
-                            repeatMode = RepeatMode.Reverse
-                        ),
-                        label = "cursor_scale"
-                    )
-                    
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .padding(end = 4.dp)
-                                .alpha(cursorAlpha)
-                                .graphicsLayer(
-                                    scaleX = cursorScale,
-                                    scaleY = cursorScale
-                                )
-                        ) {
-                            Text(
-                                text = "▋",
-                                color = appColors.accent,
-                                fontSize = 16.sp
-                            )
-                        }
-                        Text(
-                            text = "Generating response...",
-                            fontSize = 12.sp,
-                            color = appColors.textSecondary
-                        )
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                // Render text - use plain text during OpenRouter animation, markdown when complete
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Render text — StreamingMarkdown during streaming (pure Compose, no flicker)
+                // MarkdownWithCodeCopy after completion (full Markwon renderer)
                 if (displayedText.isNotEmpty()) {
                     if (isError) {
                         Text(
@@ -243,17 +171,33 @@ fun ModelChatItem(
                             fontFamily = FontFamily.Monospace
                         )
                     } else if (isStreaming) {
-                        // Plain text during streaming for instant rendering (Unified Engine)
-                        Text(
-                            text = displayedText,
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            lineHeight = 22.sp,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        // Pure-Compose renderer: no AndroidView = no flicker every 30ms
+                        StreamingMarkdown(text = displayedText)
                     } else {
-                        // Markdown rendering for Gemini or completed responses
+                        // Full renderer with tables, links, etc. after streaming is done
                         MarkdownWithCodeCopy(response = displayedText, context = context)
+                    }
+                }
+                
+                // Blinking cursor shown below the streaming text
+                if (isStreaming) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        val infTrans = rememberInfiniteTransition(label = "cursor")
+                        val cursorAlpha by infTrans.animateFloat(
+                            initialValue = 0.3f, targetValue = 1f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(600, easing = FastOutSlowInEasing),
+                                repeatMode = RepeatMode.Reverse
+                            ), label = "ca"
+                        )
+                        Text(
+                            text = "▋",
+                            color = appColors.accent.copy(alpha = cursorAlpha),
+                            fontSize = 14.sp
+                        )
                     }
                 }
             }

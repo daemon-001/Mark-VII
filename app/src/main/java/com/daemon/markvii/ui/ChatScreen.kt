@@ -9,6 +9,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -78,22 +80,6 @@ fun ChatScreen(
     val chaViewModel = viewModel<ChatViewModel>()
     val chatState = chaViewModel.chatState.collectAsState().value
     val context = LocalContext.current
-    val hapticFeedback = androidx.compose.ui.platform.LocalHapticFeedback.current
-    
-    // Track haptic feedback based on chunk arrivals
-    val lastHapticTrigger = remember { mutableStateOf(0L) }
-    val hapticTrigger = chatState.hapticTrigger
-    
-    // Trigger haptic when new chunk arrives
-    LaunchedEffect(hapticTrigger) {
-        if (hapticTrigger > 0L && hapticTrigger != lastHapticTrigger.value) {
-            hapticFeedback.performHapticFeedback(
-                androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove
-            )
-            lastHapticTrigger.value = hapticTrigger
-        }
-    }
-    
     // State for loading free models from OpenRouter and Gemini
     var isLoadingModels by remember { mutableStateOf(ChatData.cachedFreeModels.isEmpty()) }
     var freeModels by remember { mutableStateOf<List<ModelInfo>>(ChatData.cachedFreeModels) }
@@ -306,10 +292,10 @@ fun ChatScreen(
         }
     }
 
-    // Auto-scroll to bottom when new message appears or when generating
-    LaunchedEffect(chatState.chatList.size, chatState.isGeneratingResponse) {
+    // Auto-scroll to bottom when new message appears
+    LaunchedEffect(chatState.chatList.size) {
         if (chatState.chatList.isNotEmpty()) {
-            listState.animateScrollToItem(0)
+            listState.scrollToItem(0)
         }
     }
     
@@ -395,7 +381,8 @@ fun ChatScreen(
                                 chaViewModel.onEvent(
                                     ChatUiEvent.RetryPrompt(
                                         previousUserChat?.prompt ?: "",
-                                        previousUserChat?.bitmap
+                                        previousUserChat?.bitmap,
+                                        index  // tells ViewModel exactly which AI message is being retried
                                     )
                                 )
                             },
@@ -645,48 +632,17 @@ fun ChatScreen(
                                     )
                                 }
                                 
-                                // Dropdown menu - Aesthetic design with animation
-                                val dropdownScale by androidx.compose.animation.core.animateFloatAsState(
-                                    targetValue = if (isPromptDropDownExpanded.value) 1f else 0.95f,
-                                    animationSpec = spring(
-                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                        stiffness = Spring.StiffnessMedium
-                                    ),
-                                    label = "dropdown_scale"
-                                )
-                                
-                                Box(
+                                // Dropdown menu with Material3 built-in animations (no always-running animateFloatAsState)
+                                DropdownMenu(
+                                    expanded = isPromptDropDownExpanded.value,
+                                    onDismissRequest = { isPromptDropDownExpanded.value = false },
                                     modifier = Modifier
                                         .width(320.dp)
-                                        .graphicsLayer {
-                                            scaleX = dropdownScale
-                                            scaleY = dropdownScale
-                                            alpha = if (isPromptDropDownExpanded.value) 1f else 0f
-                                        }
-                                        .shadow(
-                                            elevation = 12.dp,
-                                            shape = RoundedCornerShape(20.dp),
-                                            ambientColor = Color.Black.copy(alpha = 0.5f),
-                                            spotColor = Color.Black.copy(alpha = 0.5f)
-                                        )
-                                        .clip(RoundedCornerShape(20.dp))
-                                        .background(MaterialTheme.colorScheme.surface)
-                                        .border(
-                                            width = 1.dp,
-                                            color = appColors.divider,
-                                            shape = RoundedCornerShape(20.dp)
-                                        )
+                                        .heightIn(max = 450.dp)
+                                        .background(MaterialTheme.colorScheme.surface),
+                                    shape = RoundedCornerShape(20.dp),
+                                    containerColor = MaterialTheme.colorScheme.surface
                                 ) {
-                                    DropdownMenu(
-                                        expanded = isPromptDropDownExpanded.value,
-                                        onDismissRequest = { isPromptDropDownExpanded.value = false },
-                                        modifier = Modifier
-                                            .width(320.dp)
-                                            .heightIn(max = 450.dp)
-                                            .background(MaterialTheme.colorScheme.surface),
-                                        shape = RoundedCornerShape(20.dp),
-                                        containerColor = MaterialTheme.colorScheme.surface
-                                    ) {
                                         // API Provider Switch at the top
                                         Column(
                                             modifier = Modifier
@@ -943,7 +899,6 @@ fun ChatScreen(
                                         }
                                     }
                                     }
-                                }
                             }
                             }
                             
@@ -968,50 +923,49 @@ fun ChatScreen(
                                     }
                                 }
                                 
-                                Box(
+                                // Canvas-based waveform: single composable replaces 60 Box composables
+                                // Eliminates ~33 recompositions/sec during mic input
+                                val waveformColor = appColors.textPrimary
+                                val errorColor = appColors.error
+                                val dividerColor = appColors.divider
+                                Canvas(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(40.dp)
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(Color.Transparent)
                                         .padding(horizontal = 4.dp, vertical = 6.dp)
                                 ) {
-                                    // Center line
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(1.dp)
-                                            .align(Alignment.Center)
-                                            .background(appColors.divider.copy(alpha = 0.3f))
+                                    val barCount = waveformData.size
+                                    val barWidth = size.width / (barCount * 2f - 1f)
+                                    val centerY = size.height / 2f
+
+                                    // Center guide line
+                                    drawLine(
+                                        color = dividerColor.copy(alpha = 0.3f),
+                                        start = Offset(0f, centerY),
+                                        end = Offset(size.width, centerY),
+                                        strokeWidth = 1f
                                     )
-                                    
-                                    // Waveform bars moving from right to left
-                                    Row(
-                                        modifier = Modifier.fillMaxSize(),
-                                        horizontalArrangement = Arrangement.spacedBy(1.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        waveformData.forEachIndexed { index, amplitude ->
-                                            // Fade out older bars (left side)
-                                            val alpha = (index.toFloat() / waveformData.size).coerceIn(0.3f, 1f)
-                                            
-                                            Box(
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .fillMaxHeight(amplitude)
-                                                    .clip(RoundedCornerShape(2.dp))
-                                                    .background(appColors.textPrimary.copy(alpha = alpha))
-                                            )
-                                        }
+
+                                    // Waveform bars
+                                    waveformData.forEachIndexed { index, amplitude ->
+                                        val alpha = (index.toFloat() / barCount).coerceIn(0.3f, 1f)
+                                        val barHeight = size.height * amplitude
+                                        val x = index * (barWidth * 2f)
+                                        drawRoundRect(
+                                            color = waveformColor.copy(alpha = alpha),
+                                            topLeft = Offset(x, centerY - barHeight / 2f),
+                                            size = androidx.compose.ui.geometry.Size(barWidth, barHeight),
+                                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(4f)
+                                        )
                                     }
-                                    
-                                    // Current position indicator (red line on the right)
-                                    Box(
-                                        modifier = Modifier
-                                            .width(2.dp)
-                                            .fillMaxHeight()
-                                            .align(Alignment.CenterEnd)
-                                            .background(appColors.error.copy(alpha = 0.8f))
+
+                                    // Red position indicator line on far right
+                                    drawLine(
+                                        color = errorColor.copy(alpha = 0.8f),
+                                        start = Offset(size.width - 2f, 0f),
+                                        end = Offset(size.width - 2f, size.height),
+                                        strokeWidth = 4f
                                     )
                                 }
                             }
@@ -1146,4 +1100,7 @@ fun ChatScreen(
         }
     } // ModalNavigationDrawer
 
-}
+} // ChatScreen
+
+
+
