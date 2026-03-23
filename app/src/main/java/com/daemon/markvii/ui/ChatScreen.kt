@@ -353,6 +353,7 @@ fun ChatScreen(
             // Memoize model lists to prevent unnecessary recompositions
             val stableFreeModels = remember(freeModels) { freeModels }
             val stableGeminiModels = remember(geminiModels) { geminiModels }
+            val stableGroqModels = remember(groqModels) { groqModels }
             
             LazyColumn(
                 modifier = Modifier
@@ -387,6 +388,7 @@ fun ChatScreen(
                             isError = chat.isError,
                             freeModels = stableFreeModels,
                             geminiModels = stableGeminiModels,
+                            groqModels = stableGroqModels,
                             currentApiProvider = currentApiProvider,
                             hasImage = previousUserChat?.bitmap != null,
                             onRetry = { _ ->

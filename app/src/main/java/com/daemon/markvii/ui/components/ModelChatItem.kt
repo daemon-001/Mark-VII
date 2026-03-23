@@ -47,6 +47,7 @@ fun ModelChatItem(
     isStreaming: Boolean = false,
     freeModels: List<ModelInfo> = emptyList(),
     geminiModels: List<ModelInfo> = emptyList(),
+    groqModels: List<ModelInfo> = emptyList(),
     currentApiProvider: ApiProvider = ApiProvider.GEMINI,
     hasImage: Boolean = false,
     isError: Boolean = false,
@@ -526,6 +527,48 @@ fun ModelChatItem(
                                         FontWeight.Normal
                                 )
                             }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            // Groq button
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(
+                                        if (selectedApiProvider == ApiProvider.GROQ)
+                                            appColors.accent.copy(alpha = 0.2f)
+                                        else
+                                            appColors.surfaceVariant
+                                    )
+                                    .clickable {
+                                        if (hasImage) {
+                                            Toast.makeText(
+                                                context,
+                                                "⚠️ Groq doesn't support images. Please use Gemini for image queries.",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        } else {
+                                            selectedApiProvider = ApiProvider.GROQ
+                                            onApiSwitch(ApiProvider.GROQ)
+                                        }
+                                    }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Groq",
+                                    color = if (selectedApiProvider == ApiProvider.GROQ)
+                                        appColors.accent
+                                    else
+                                        appColors.textSecondary,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (selectedApiProvider == ApiProvider.GROQ)
+                                        FontWeight.SemiBold
+                                    else
+                                        FontWeight.Normal
+                                )
+                            }
                         }
                         
                         // Show warning if image exists and OpenRouter selected
@@ -563,7 +606,11 @@ fun ModelChatItem(
                         )
                         
                         // Model List
-                        val currentModels = if (selectedApiProvider == ApiProvider.GEMINI) geminiModels else freeModels
+                        val currentModels = when (selectedApiProvider) {
+                            ApiProvider.GEMINI -> geminiModels
+                            ApiProvider.OPENROUTER -> freeModels
+                            ApiProvider.GROQ -> groqModels
+                        }
                         
                         LazyColumn(
                             modifier = Modifier
