@@ -10,10 +10,11 @@ data class Chat (
     val prompt: String,
     val bitmap: Bitmap?,
     val isFromUser: Boolean,
-    val modelUsed: String = "", // Model identifier (e.g., "deepseek/deepseek-chat-v3.1")
-    val isStreaming: Boolean = false, // Track if response is still streaming
-    val id: String = UUID.randomUUID().toString(), // Unique identifier for each chat
-    val isError: Boolean = false // Track if this is an error message
+    val modelUsed: String = "",
+    val isStreaming: Boolean = false,
+    val id: String = UUID.randomUUID().toString(),
+    val isError: Boolean = false,
+    val retryOfPrompt: String? = null // set when this is a retry response; contains the original user prompt
 )
 
 

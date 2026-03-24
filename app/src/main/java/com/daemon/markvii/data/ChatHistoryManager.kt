@@ -41,8 +41,9 @@ object ChatHistoryManager {
                     bitmapBase64 = chat.bitmap?.let { bitmapToBase64(it) },
                     isFromUser = chat.isFromUser,
                     modelUsed = chat.modelUsed,
-                    isStreaming = false, // Don't persist streaming state
-                    id = chat.id
+                    isStreaming = false,
+                    id = chat.id,
+                    retryOfPrompt = chat.retryOfPrompt
                 )
             }
             
@@ -75,7 +76,8 @@ object ChatHistoryManager {
                     isFromUser = serializableChat.isFromUser,
                     modelUsed = serializableChat.modelUsed,
                     isStreaming = false,
-                    id = serializableChat.id
+                    id = serializableChat.id,
+                    retryOfPrompt = serializableChat.retryOfPrompt
                 )
             }
         } catch (e: Exception) {
@@ -122,6 +124,7 @@ object ChatHistoryManager {
         val isFromUser: Boolean,
         val modelUsed: String,
         val isStreaming: Boolean,
-        val id: String
+        val id: String,
+        val retryOfPrompt: String? = null
     )
 }

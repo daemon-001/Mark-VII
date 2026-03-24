@@ -80,19 +80,14 @@ class ChatViewModel : ViewModel() {
             is ChatUiEvent.RetryPrompt -> {
                 if (event.prompt.isNotEmpty()) {
                     _chatState.update { it.copy(isGeneratingResponse = true) }
-                    
-                    // Truncate: drop the old AI response and everything after it (newer messages).
-                    // chatList is reversed (index 0 = newest), so drop items 0..modelResponseIndex.
-                    // This leaves history up to the user message that originally triggered this response.
-                    _chatState.update { state ->
-                        val trimmed = state.chatList.drop(event.modelResponseIndex + 1).toMutableList()
-                        state.copy(chatList = trimmed)
-                    }
-                    
                     if (event.bitmap != null) {
                         getResponseWithImage(event.prompt, event.bitmap)
                     } else {
-                        getResponse(event.prompt, isRetry = false)
+                        getResponse(
+                            prompt = event.prompt,
+                            retryOfPrompt = event.retryOfPrompt,
+                            historyTrimIndex = event.modelResponseIndex  // trim history to this point
+                        )
                     }
                 }
             }
@@ -271,7 +266,7 @@ class ChatViewModel : ViewModel() {
         saveChatHistory() // Save after adding prompt
     }
 
-    private fun getResponse(prompt: String, isRetry: Boolean = false) {
+    private fun getResponse(prompt: String, isRetry: Boolean = false, retryOfPrompt: String? = null, historyTrimIndex: Int = -1) {
         streamingJob = viewModelScope.launch {
             var lastEmitMs = 0L
             try {
@@ -286,7 +281,8 @@ class ChatViewModel : ViewModel() {
                             bitmap = null,
                             isFromUser = false,
                             modelUsed = ChatData.selected_model,
-                            isStreaming = true
+                            isStreaming = true,
+                            retryOfPrompt = retryOfPrompt
                         )
                         
                         _chatState.update {
@@ -297,20 +293,18 @@ class ChatViewModel : ViewModel() {
                             )
                         }
                         
-                        // Get conversation history (exclude the current prompt and streaming placeholder)
-                        val historySource = _chatState.value.chatList.drop(1)
-                        
-                        // If retrying, exclude the most recent assistant message from context
-                        // This prevents the model from seeing its previous (failed/rejected) response
-                        val historyFiltered = if (isRetry && historySource.isNotEmpty() && !historySource[0].isFromUser) {
-                            historySource.drop(1)
+                        // Get conversation history.
+                        // For retry: trim to only messages AFTER the retried AI bubble
+                        // (historyTrimIndex = its position in chatList, after the new streaming placeholder)
+                        val historySource = if (historyTrimIndex >= 0) {
+                            _chatState.value.chatList.drop(1).drop(historyTrimIndex)
                         } else {
-                            historySource
+                            _chatState.value.chatList.drop(1)
                         }
 
-                        val conversationHistory = historyFiltered
-                            .filter { !it.isStreaming } // Skip any other streaming messages
-                            .reversed() // Reverse to chronological order
+                        val conversationHistory = historySource
+                            .filter { !it.isStreaming }
+                            .reversed()
                         
                         GeminiClient.generateContentStream(
                             prompt = prompt,
@@ -369,7 +363,8 @@ class ChatViewModel : ViewModel() {
                             bitmap = null,
                             isFromUser = false,
                             modelUsed = ChatData.selected_model,
-                            isStreaming = true
+                            isStreaming = true,
+                            retryOfPrompt = retryOfPrompt
                         )
                         
                         _chatState.update {
@@ -380,19 +375,15 @@ class ChatViewModel : ViewModel() {
                             )
                         }
                         
-                        // Get conversation history (exclude the current prompt and streaming placeholder)
-                        val historySource = _chatState.value.chatList.drop(1)
-                        
-                        // If retrying, exclude the most recent assistant message from context
-                        val historyFiltered = if (isRetry && historySource.isNotEmpty() && !historySource[0].isFromUser) {
-                            historySource.drop(1)
+                        val historySource = if (historyTrimIndex >= 0) {
+                            _chatState.value.chatList.drop(1).drop(historyTrimIndex)
                         } else {
-                            historySource
+                            _chatState.value.chatList.drop(1)
                         }
 
-                        val conversationHistory = historyFiltered
-                            .filter { !it.isStreaming } // Skip any other streaming messages
-                            .reversed() // Reverse to chronological order
+                        val conversationHistory = historySource
+                            .filter { !it.isStreaming }
+                            .reversed()
                         
                         val chat = ChatData.getStreamingResponse(
                             prompt = prompt,
@@ -418,7 +409,14 @@ class ChatViewModel : ViewModel() {
                         _chatState.update { state ->
                             val updatedList = state.chatList.toMutableList()
                             if (updatedList.isNotEmpty()) {
-                                updatedList[0] = chat.copy(isStreaming = false)
+                                val inMemory = updatedList[0]
+                                // chat has the authoritative final text/error from the API;
+                                // inMemory has retryOfPrompt + id we must preserve.
+                                updatedList[0] = chat.copy(
+                                    isStreaming = false,
+                                    retryOfPrompt = inMemory.retryOfPrompt,
+                                    id = inMemory.id
+                                )
                             }
                             state.copy(
                                 chatList = updatedList,
@@ -435,7 +433,8 @@ class ChatViewModel : ViewModel() {
                             bitmap = null,
                             isFromUser = false,
                             modelUsed = ChatData.selected_model,
-                            isStreaming = true
+                            isStreaming = true,
+                            retryOfPrompt = retryOfPrompt
                         )
 
                         _chatState.update {
@@ -446,13 +445,12 @@ class ChatViewModel : ViewModel() {
                             )
                         }
 
-                        val historySource = _chatState.value.chatList.drop(1)
-                        val historyFiltered = if (isRetry && historySource.isNotEmpty() && !historySource[0].isFromUser) {
-                            historySource.drop(1)
+                        val historySource = if (historyTrimIndex >= 0) {
+                            _chatState.value.chatList.drop(1).drop(historyTrimIndex)
                         } else {
-                            historySource
+                            _chatState.value.chatList.drop(1)
                         }
-                        val conversationHistory = historyFiltered
+                        val conversationHistory = historySource
                             .filter { !it.isStreaming }
                             .reversed()
 
@@ -480,7 +478,14 @@ class ChatViewModel : ViewModel() {
                         _chatState.update { state ->
                             val updatedList = state.chatList.toMutableList()
                             if (updatedList.isNotEmpty()) {
-                                updatedList[0] = chat.copy(isStreaming = false)
+                                val inMemory = updatedList[0]
+                                // chat has the authoritative final text/error from the API;
+                                // inMemory has retryOfPrompt + id we must preserve.
+                                updatedList[0] = chat.copy(
+                                    isStreaming = false,
+                                    retryOfPrompt = inMemory.retryOfPrompt,
+                                    id = inMemory.id
+                                )
                             }
                             state.copy(
                                 chatList = updatedList,

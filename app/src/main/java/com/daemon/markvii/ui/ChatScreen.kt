@@ -335,6 +335,10 @@ fun ChatScreen(
                     } else null
                 }.toMap()
             }
+
+            // Blink state: holds the id of the user bubble that should blink
+            var blinkingChatId by remember { mutableStateOf<String?>(null) }
+            val blinkScope = rememberCoroutineScope()
             
             // Memoize model lists to prevent unnecessary recompositions
             val stableFreeModels = remember(freeModels) { freeModels }
@@ -360,12 +364,13 @@ fun ChatScreen(
                 ) { index, chat ->
                     if (chat.isFromUser) {
                         UserChatItem(
-                            prompt = chat.prompt, bitmap = chat.bitmap
+                            prompt = chat.prompt,
+                            bitmap = chat.bitmap,
+                            isBlinking = chat.id == blinkingChatId
                         )
                     } else {
-                        // Use pre-computed previous user chat from map
                         val previousUserChat = previousUserChatMap[index]
-                        
+
                         ModelChatItem(
                             response = chat.prompt,
                             userPrompt = previousUserChat?.prompt ?: "",
@@ -377,12 +382,30 @@ fun ChatScreen(
                             groqModels = stableGroqModels,
                             currentApiProvider = currentApiProvider,
                             hasImage = previousUserChat?.bitmap != null,
+                            retryOfPrompt = chat.retryOfPrompt,
+                            onScrollToPrompt = {
+                                // Find the user message that matches retryOfPrompt
+                                val targetPrompt = chat.retryOfPrompt ?: return@ModelChatItem
+                                val targetIndex = chatState.chatList.indexOfFirst {
+                                    it.isFromUser && it.prompt == targetPrompt
+                                }
+                                if (targetIndex != -1) {
+                                    val targetId = chatState.chatList[targetIndex].id
+                                    blinkScope.launch {
+                                        listState.animateScrollToItem(targetIndex)
+                                        blinkingChatId = targetId
+                                        delay(1500)
+                                        blinkingChatId = null
+                                    }
+                                }
+                            },
                             onRetry = { _ ->
                                 chaViewModel.onEvent(
                                     ChatUiEvent.RetryPrompt(
                                         previousUserChat?.prompt ?: "",
                                         previousUserChat?.bitmap,
-                                        index  // tells ViewModel exactly which AI message is being retried
+                                        index,
+                                        retryOfPrompt = previousUserChat?.prompt ?: ""
                                     )
                                 )
                             },

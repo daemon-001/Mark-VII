@@ -55,7 +55,9 @@ fun ModelChatItem(
     isTtsSpeaking: Boolean,
     onStopTts: () -> Unit,
     onSpeak: (String) -> Unit,
-    isTtsReady: Boolean
+    isTtsReady: Boolean,
+    retryOfPrompt: String? = null,       // non-null = this is a retry bubble; value = source prompt text
+    onScrollToPrompt: () -> Unit = {}    // called when user taps the source prompt tag
 ) {
     val appColors = LocalAppColors.current
     val context = LocalContext.current
@@ -156,6 +158,39 @@ fun ModelChatItem(
                         color = appColors.textSecondary,
                         modifier = Modifier.padding(top = 2.dp)
                     )
+                }
+                // Retry source-prompt tag chip — tapping scrolls to the original prompt
+                if (retryOfPrompt != null) {
+                    val shortPrompt = if (retryOfPrompt.length > 40)
+                        retryOfPrompt.take(40) + "…" else retryOfPrompt
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .padding(top = 6.dp, bottom = 2.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(appColors.surfaceTertiary)
+                            .clickable(
+                                onClick = onScrollToPrompt,
+                                indication = null,
+                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                            )
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Refresh,
+                            contentDescription = "Retried from",
+                            tint = appColors.textSecondary,
+                            modifier = Modifier
+                                .size(15.dp)
+                                .padding(end = 0.dp)
+                        )
+                        Text(
+                            text = "  $shortPrompt",
+                            fontSize = 15.sp,
+                            color = appColors.textSecondary,
+                            maxLines = 1
+                        )
+                    }
                 }
                 
                 Spacer(modifier = Modifier.height(12.dp))

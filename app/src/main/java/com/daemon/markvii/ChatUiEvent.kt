@@ -15,7 +15,8 @@ sealed class ChatUiEvent {
     data class RetryPrompt(
         val prompt: String,
         val bitmap: Bitmap?,
-        val modelResponseIndex: Int  // index of the AI message being retried in chatList
+        val modelResponseIndex: Int,
+        val retryOfPrompt: String          // the user prompt text to display as tag
     ) : ChatUiEvent()
     object StopStreaming : ChatUiEvent()
     data class SwitchApiProvider(val provider: ApiProvider) : ChatUiEvent()
