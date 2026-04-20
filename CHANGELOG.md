@@ -3,6 +3,37 @@
 All notable changes to the Mark VII project are documented in this file.
 
 ---
+## v3.3.1 (30310)
+April 20, 2026 20:26:19 +0530
+
+### Retry UX & Traceability
+- **Retry Source Linking**: Retry actions now preserve metadata about the original user prompt (`retryOfPrompt`) so regenerated assistant replies remain traceable.
+- **"Retried From" Tag**: Assistant retry bubbles show a compact source-prompt tag; tapping it scrolls directly to the originating user message.
+- **Prompt Highlight Blink**: When jumping to a source prompt, the target user bubble gets a temporary blinking accent border for quick visual confirmation.
+- **Cleaner Retry Context**: Retry generation trims context at the retried response point so stale assistant output and later turns do not pollute regenerated responses.
+
+### Streaming Performance & Rendering
+- **Throttled Stream Updates**: Streaming chunk UI updates are rate-limited to roughly 60 FPS (16ms cadence) to reduce Compose churn and improve smoothness.
+- **Pure Compose Streaming Renderer**: Added `StreamingMarkdown` for low-flicker, in-progress markdown rendering during live generation.
+- **Full Markdown Post-Stream**: After streaming completes, rendering switches to `MarkdownWithCodeCopy` for full markdown display and code copy actions.
+- **Localized Haptics**: Haptic feedback now triggers from streaming chunk growth inside message UI (debounced) instead of global state-based triggers.
+- **Voice Waveform Optimization**: Mic waveform rendering moved to a single `Canvas` path, replacing many per-bar composables and reducing recompositions.
+- **Auto-Scroll Refinement**: Chat list auto-scroll now reacts to new message arrival instead of generation-state toggles for more stable scrolling behavior.
+
+### Session Persistence & Drawer Stability
+- **Per-User Session Cache**: Added local file-based caching of chat sessions (`chat_sessions_<userId>.json`) for faster drawer/session loading.
+- **Cache-First Session Load**: Session list now hydrates from local cache first, then refreshes from Firestore and rewrites cache.
+- **Broader Session Persistence**: Session cache is updated during create/save/rename/delete/session-sync flows to keep local and remote state aligned.
+- **IO Threading Improvements**: Session/network and migration workflows were moved to IO dispatchers to reduce UI-thread blocking risk.
+- **Drawer Recomposition Hardening**: Drawer callbacks were stabilized (`remember`/`rememberUpdatedState`), date formatter reuse was added, and primitive props are passed to session rows for more stable recomposition.
+- **Scaffold Cleanup**: Removed the one-time welcome-guide trigger hack from `MainActivity` bottom bar scaffolding.
+
+### Provider & Request Handling Fixes
+- **Groq in Retry Selector**: Groq models are now fully available in the retry-time model selector path alongside Gemini and OpenRouter.
+- **Provider Capability Guard**: Selecting Groq for image-based retries now surfaces a clear warning because image input is unsupported for Groq in-app.
+- **Duplicate Request Cleanup**: Removed redundant prompt insertion in OpenRouter request message assembly to avoid duplicate user-message payloads.
+
+---
 ## v3.3.0 (30300)
 March 20, 2026 15:20:00 +0530
 
