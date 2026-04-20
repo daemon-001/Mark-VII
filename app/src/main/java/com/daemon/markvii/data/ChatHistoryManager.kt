@@ -19,6 +19,7 @@ object ChatHistoryManager {
     private const val MAX_CHAT_HISTORY = 50 // Limit to prevent excessive storage
     
     private lateinit var prefs: SharedPreferences
+    private lateinit var appContext: Context
     private val gson = Gson()
     
     /**
@@ -26,6 +27,7 @@ object ChatHistoryManager {
      * Call this once during app startup
      */
     fun init(context: Context) {
+        appContext = context.applicationContext
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
     
@@ -112,6 +114,53 @@ object ChatHistoryManager {
             BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
         } catch (e: Exception) {
             null
+        }
+    }
+    
+    /**
+     * Save user chat sessions to local file cache
+     */
+    fun saveUserSessions(userId: String, sessions: List<ChatSession>) {
+        if (!::appContext.isInitialized) return
+        try {
+            val file = java.io.File(appContext.filesDir, "chat_sessions_$userId.json")
+            val json = gson.toJson(sessions)
+            file.writeText(json)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+    
+    /**
+     * Load user chat sessions from local file cache
+     */
+    fun loadUserSessions(userId: String): List<ChatSession> {
+        if (!::appContext.isInitialized) return emptyList()
+        try {
+            val file = java.io.File(appContext.filesDir, "chat_sessions_$userId.json")
+            if (!file.exists()) return emptyList()
+            
+            val json = file.readText()
+            val type = object : TypeToken<List<ChatSession>>() {}.type
+            return gson.fromJson(json, type) ?: emptyList()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return emptyList()
+        }
+    }
+    
+    /**
+     * Clear user sessions cache for a specific user
+     */
+    fun clearUserSessionsCache(userId: String) {
+        if (!::appContext.isInitialized) return
+        try {
+            val file = java.io.File(appContext.filesDir, "chat_sessions_$userId.json")
+            if (file.exists()) {
+                file.delete()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
     

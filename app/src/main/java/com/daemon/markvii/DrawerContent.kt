@@ -31,12 +31,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberAsyncImagePainter
+import java.text.SimpleDateFormat
+import java.util.Locale
 import com.daemon.markvii.data.AuthManager
 import com.daemon.markvii.data.ChatSession
 import com.daemon.markvii.ui.theme.LocalAppColors
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.*
+import kotlinx.coroutines.launch
+
+// Static formatter to avoid creating multiple instances during LazyColumn recomposition
+private val dateFormatter = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
 
 /**
  * Side drawer content for chat session management
@@ -70,30 +74,54 @@ fun DrawerContent(
         val currentUser = chatState.currentUser
         
         if (currentUser != null) {
+            // Stable callbacks
+            val currentOnSettingsClick by rememberUpdatedState(onSettingsClick)
+            val currentOnDismiss by rememberUpdatedState(onDismiss)
+            
+            val stableOnNewChat: () -> Unit = remember(chatViewModel) {
+                {
+                    chatViewModel.onEvent(ChatUiEvent.CreateNewSession)
+                    currentOnDismiss()
+                }
+            }
+            
+            val stableOnSessionClick: (String) -> Unit = remember(chatViewModel) {
+                { sessionId ->
+                    chatViewModel.onEvent(ChatUiEvent.SwitchSession(sessionId))
+                    currentOnDismiss()
+                }
+            }
+            
+            val stableOnSessionDelete: (String) -> Unit = remember(chatViewModel) {
+                { sessionId ->
+                    chatViewModel.onEvent(ChatUiEvent.DeleteSession(sessionId))
+                }
+            }
+            
+            val stableOnRename: (String, String) -> Unit = remember(chatViewModel) {
+                { sessionId, newTitle ->
+                    chatViewModel.onEvent(ChatUiEvent.RenameSession(sessionId, newTitle))
+                }
+            }
+            
+            val stableOnSignOut: () -> Unit = remember(chatViewModel) {
+                {
+                    chatViewModel.onEvent(ChatUiEvent.SignOut)
+                    currentOnDismiss()
+                }
+            }
+
             // Authenticated state
             AuthenticatedDrawerContent(
                 user = currentUser,
-                sessions = chatState.chatSessions,
+                sessions = chatState.chatSessions, // Unstable list but sorted internally
                 currentSessionId = chatState.currentSessionId,
-                onNewChat = {
-                    chatViewModel.onEvent(ChatUiEvent.CreateNewSession)
-                    onDismiss()
-                },
-                onSessionClick = { sessionId ->
-                    chatViewModel.onEvent(ChatUiEvent.SwitchSession(sessionId))
-                    onDismiss()
-                },
-                onSessionDelete = { sessionId ->
-                    chatViewModel.onEvent(ChatUiEvent.DeleteSession(sessionId))
-                },
-                onRename = { sessionId, newTitle ->
-                    chatViewModel.onEvent(ChatUiEvent.RenameSession(sessionId, newTitle))
-                },
-                onSignOut = {
-                    chatViewModel.onEvent(ChatUiEvent.SignOut)
-                    onDismiss()
-                },
-                onSettingsClick = onSettingsClick
+                onNewChat = stableOnNewChat,
+                onSessionClick = stableOnSessionClick,
+                onSessionDelete = stableOnSessionDelete,
+                onRename = stableOnRename,
+                onSignOut = stableOnSignOut,
+                onSettingsClick = { currentOnSettingsClick() }
             )
         } else {
             // Unauthenticated state
@@ -388,11 +416,13 @@ fun AuthenticatedDrawerContent(
                 contentType = { "chat_session" }
             ) { session ->
                 ChatSessionItem(
-                    session = session,
+                    sessionId = session.id,
+                    sessionTitle = session.title,
+                    sessionUpdatedAt = session.updatedAt.toDate().time,
                     isSelected = session.id == currentSessionId,
-                    onClick = { onSessionClick(session.id) },
-                    onDelete = { onSessionDelete(session.id) },
-                    onRename = { newTitle -> onRename(session.id, newTitle) }
+                    onClick = onSessionClick,
+                    onDelete = onSessionDelete,
+                    onRename = onRename
                 )
             }
         }
@@ -402,20 +432,22 @@ fun AuthenticatedDrawerContent(
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun ChatSessionItem(
-    session: ChatSession,
+    sessionId: String,
+    sessionTitle: String,
+    sessionUpdatedAt: Long, // primitive for stability
     isSelected: Boolean,
-    onClick: () -> Unit,
-    onDelete: () -> Unit,
-    onRename: (String) -> Unit
+    onClick: (String) -> Unit,
+    onDelete: (String) -> Unit,
+    onRename: (String, String) -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     val appColors = LocalAppColors.current // Get theme colors in this scope
     
-    // Memoize formatted date to prevent recalculation
-    val formattedDate = remember(session.updatedAt) {
-        SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(session.updatedAt.toDate())
+    // Format date string
+    val formattedDate = remember(sessionUpdatedAt) {
+        dateFormatter.format(java.util.Date(sessionUpdatedAt))
     }
     
     Box(
@@ -425,7 +457,7 @@ fun ChatSessionItem(
             .clip(RoundedCornerShape(8.dp))
             .background(if (isSelected) appColors.surfaceVariant else Color.Transparent)
             .combinedClickable(
-                onClick = onClick,
+                onClick = { onClick(sessionId) },
                 onLongClick = { showMenu = true }
             )
             .padding(horizontal = 12.dp, vertical = 8.dp)
@@ -436,7 +468,7 @@ fun ChatSessionItem(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = session.title,
+                    text = sessionTitle,
                     fontSize = 13.sp,
                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                     color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface,
@@ -495,7 +527,7 @@ fun ChatSessionItem(
     
     // Rename Dialog
     if (showRenameDialog) {
-        var newTitle by remember { mutableStateOf(session.title) }
+        var newTitle by remember { mutableStateOf(sessionTitle) }
         
         AlertDialog(
             onDismissRequest = { showRenameDialog = false },
@@ -518,7 +550,7 @@ fun ChatSessionItem(
                 TextButton(
                     onClick = {
                         if (newTitle.isNotBlank()) {
-                            onRename(newTitle)
+                            onRename(sessionId, newTitle)
                             showRenameDialog = false
                         }
                     }
@@ -546,7 +578,7 @@ fun ChatSessionItem(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        onDelete()
+                        onDelete(sessionId)
                         showDeleteDialog = false
                     },
                     colors = ButtonDefaults.textButtonColors(

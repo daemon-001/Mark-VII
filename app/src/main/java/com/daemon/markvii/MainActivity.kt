@@ -292,7 +292,6 @@ class MainActivity : AppCompatActivity() {
             }
 
             MarkVIITheme(darkTheme = darkTheme) {
-                var opentimes by remember { mutableIntStateOf(0) }
                 // A surface container using the 'background' color from the theme
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -314,8 +313,6 @@ class MainActivity : AppCompatActivity() {
                         val navController = rememberNavController()
                         NavHost(navController = navController, startDestination = "home", builder = {
                         composable("home",){
-                            opentimes++
-                            
                             // ViewModel needs to be at this scope to be accessible by both topBar and content
                             val chaViewModel = viewModel<ChatViewModel>()
                             val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -476,12 +473,9 @@ class MainActivity : AppCompatActivity() {
                                     }
                                 }
                             },
-
-//                                    Show welcome guide once when app opens (no API call)
+                        // Provide empty bottom bar to fulfill Scaffold contract without welcome guide hack
                                 bottomBar = {
-                                if(opentimes==1){
-                                    chaViewModel.showWelcomeGuide()
-                                }
+                                    
                             }
                             ) {
                                 ChatScreen(
