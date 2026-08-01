@@ -50,19 +50,11 @@ fun OnboardingScreen(
     val scope = rememberCoroutineScope()
     val appColors = LocalAppColors.current
 
-    // Background gradient
+    // Background
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF1A1A2E), // Dark purple/blue
-                        Color(0xFF16213E),
-                        Color(0xFF0F3460)
-                    )
-                )
-            )
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
@@ -126,7 +118,7 @@ fun OnboardingScreen(
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = appColors.accent,
-                        contentColor = Color.White
+                        contentColor = appColors.onAccent
                     ),
                     contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
                 ) {
@@ -199,7 +191,6 @@ fun WelcomeContent() {
             text = "Welcome to\nMark VII",
             style = MaterialTheme.typography.displayMedium,
             fontWeight = FontWeight.Bold,
-            color = Color.White,
             textAlign = TextAlign.Center,
             lineHeight = 44.sp
         )
@@ -231,12 +222,11 @@ fun WelcomeContent() {
 
         Box(
             modifier = Modifier
-                .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
                 .padding(16.dp)
         ) {
             Text(
                 text = "Access 50+ latest AI Models",
-                color = Color.White,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center
@@ -254,7 +244,6 @@ fun ArchitectureContent() {
             text = "Power &\nFlexibility",
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
-            color = Color.White,
             textAlign = TextAlign.Center
         )
 
@@ -292,7 +281,7 @@ fun FeatureRow(icon: ImageVector, title: String, subtitle: String? = null, color
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
             .padding(16.dp)
     ) {
         Box(
@@ -314,7 +303,6 @@ fun FeatureRow(icon: ImageVector, title: String, subtitle: String? = null, color
         Column {
             Text(
                 text = title,
-                color = Color.White,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 16.sp
             )
@@ -322,7 +310,7 @@ fun FeatureRow(icon: ImageVector, title: String, subtitle: String? = null, color
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = subtitle,
-                    color = Color.White.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                     fontSize = 12.sp,
                     lineHeight = 16.sp
                 )
@@ -340,7 +328,6 @@ fun AdvancedContent() {
             text = "Voice, Vision\n& More",
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
-            color = Color.White,
             textAlign = TextAlign.Center
         )
         
@@ -348,7 +335,7 @@ fun AdvancedContent() {
         
         Text(
             text = "Experience multi-modal capabilities...",
-            color = Color.White.copy(alpha = 0.6f),
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
             fontSize = 16.sp
         )
 
@@ -370,7 +357,7 @@ fun AdvancedContent() {
 
         Text(
             text = "Full support for Voice I/O and professional PDF Export.",
-            color = Color.White.copy(alpha = 0.9f),
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.9f),
             textAlign = TextAlign.Center,
             fontSize = 16.sp,
             modifier = Modifier.padding(horizontal = 32.dp)

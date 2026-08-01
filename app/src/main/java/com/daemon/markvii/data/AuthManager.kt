@@ -154,12 +154,52 @@ object AuthManager {
     }
     
     /**
-     * Hash the nonce using SHA-256
+     * Sign in with Email and Password
      */
-    private fun hashNonce(nonce: String): String {
-        val bytes = nonce.toByteArray()
-        val md = MessageDigest.getInstance("SHA-256")
-        val digest = md.digest(bytes)
-        return digest.fold("") { str, it -> str + "%02x".format(it) }
+    suspend fun signInWithEmailAndPassword(email: String, password: String): Result<FirebaseUser> {
+        return try {
+            val authResult = auth.signInWithEmailAndPassword(email, password).await()
+            val user = authResult.user
+            if (user != null) {
+                Log.d(TAG, "Email sign-in successful: ${user.email}")
+                Result.success(user)
+            } else {
+                Result.failure(Exception("SIGN_IN_FAILED|Authentication succeeded but user is null"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Email sign-in failed", e)
+            Result.failure(Exception("SIGN_IN_ERROR|${e.message ?: "Failed to sign in"}"))
+        }
+    }
+
+    /**
+     * Sign up with Email and Password
+     */
+    suspend fun signUpWithEmailAndPassword(email: String, password: String, name: String): Result<FirebaseUser> {
+        return try {
+            val authResult = auth.createUserWithEmailAndPassword(email, password).await()
+            val user = authResult.user
+            if (user != null) {
+                // Update profile with name
+                val profileUpdates = com.google.firebase.auth.UserProfileChangeRequest.Builder()
+                    .setDisplayName(name)
+                    .build()
+                user.updateProfile(profileUpdates).await()
+                
+                // Force reload to ensure display name is updated in the user object
+                user.reload().await()
+                
+                // Manually trigger a flow update by emitting the current user
+                _currentUser.value = auth.currentUser
+                
+                Log.d(TAG, "Email sign-up successful: ${auth.currentUser?.email}")
+                Result.success(auth.currentUser!!)
+            } else {
+                Result.failure(Exception("SIGN_UP_FAILED|Account created but user is null"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Email sign-up failed", e)
+            Result.failure(Exception("SIGN_UP_ERROR|${e.message ?: "Failed to create account"}"))
+        }
     }
 }

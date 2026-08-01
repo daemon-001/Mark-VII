@@ -12,10 +12,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.ExitToApp
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -36,7 +38,8 @@ import java.util.Locale
 import com.daemon.markvii.data.AuthManager
 import com.daemon.markvii.data.ChatSession
 import com.daemon.markvii.ui.theme.LocalAppColors
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 // Static formatter to avoid creating multiple instances during LazyColumn recomposition
@@ -50,10 +53,22 @@ private val dateFormatter = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault(
 fun DrawerContent(
     chatViewModel: ChatViewModel,
     onDismiss: () -> Unit,
+    onNavigateToAuth: () -> Unit,
     onSettingsClick: () -> Unit = {},
     onSigningInChanged: (Boolean) -> Unit = {}
 ) {
-    val chatState by chatViewModel.chatState.collectAsState()
+    val currentUser by remember(chatViewModel) {
+        chatViewModel.chatState.map { it.currentUser }.distinctUntilChanged()
+    }.collectAsState(initial = chatViewModel.chatState.value.currentUser)
+    
+    val chatSessions by remember(chatViewModel) {
+        chatViewModel.chatState.map { it.chatSessions }.distinctUntilChanged()
+    }.collectAsState(initial = chatViewModel.chatState.value.chatSessions)
+    
+    val currentSessionId by remember(chatViewModel) {
+        chatViewModel.chatState.map { it.currentSessionId }.distinctUntilChanged()
+    }.collectAsState(initial = chatViewModel.chatState.value.currentSessionId)
+
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val appColors = LocalAppColors.current // Get theme colors
@@ -68,12 +83,9 @@ fun DrawerContent(
         // Header
 
         
-
-        
         // Check if user is signed in
-        val currentUser = chatState.currentUser
-        
-        if (currentUser != null) {
+        val user = currentUser
+        if (user != null) {
             // Stable callbacks
             val currentOnSettingsClick by rememberUpdatedState(onSettingsClick)
             val currentOnDismiss by rememberUpdatedState(onDismiss)
@@ -113,9 +125,11 @@ fun DrawerContent(
 
             // Authenticated state
             AuthenticatedDrawerContent(
-                user = currentUser,
-                sessions = chatState.chatSessions, // Unstable list but sorted internally
-                currentSessionId = chatState.currentSessionId,
+                userDisplayName = user.displayName ?: "User",
+                userEmail = user.email ?: "",
+                userPhotoUrl = user.photoUrl,
+                sessions = chatSessions, // Unstable list but sorted internally
+                currentSessionId = currentSessionId,
                 onNewChat = stableOnNewChat,
                 onSessionClick = stableOnSessionClick,
                 onSessionDelete = stableOnSessionDelete,
@@ -126,17 +140,9 @@ fun DrawerContent(
         } else {
             // Unauthenticated state
             UnauthenticatedDrawerContent(
-                onSignIn = {
-                    onSigningInChanged(true)
-                    coroutineScope.launch {
-                        try {
-                            AuthManager.signInWithGoogle(context as ComponentActivity)
-                            // Result will be handled in MainActivity.onActivityResult
-                        } catch (e: Exception) {
-                            onSigningInChanged(false)
-                        }
-                        onDismiss()
-                    }
+                onNavigateToAuth = {
+                    onDismiss()
+                    onNavigateToAuth()
                 },
                 onNewChat = {
                     chatViewModel.onEvent(ChatUiEvent.CreateNewSession)
@@ -150,7 +156,7 @@ fun DrawerContent(
 
 @Composable
 fun UnauthenticatedDrawerContent(
-    onSignIn: () -> Unit,
+    onNavigateToAuth: () -> Unit,
     onNewChat: () -> Unit,
     onSettingsClick: () -> Unit = {}
 ) {
@@ -169,75 +175,99 @@ fun UnauthenticatedDrawerContent(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Guest",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = "Not signed in",
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
                     color = appColors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
             
+            // Login button
+            Button(
+                onClick = onNavigateToAuth,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = appColors.accent,
+                    contentColor = appColors.onAccent
+                ),
+                shape = CircleShape,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.height(36.dp)
+            ) {
+                Text("Login", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
             // Settings button
-            IconButton(onClick = onSettingsClick) {
+            IconButton(
+                onClick = onSettingsClick,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(appColors.surfaceVariant.copy(alpha = 0.5f))
+            ) {
                 Icon(
                     imageVector = Icons.Rounded.Settings,
                     contentDescription = "Settings",
-                    tint = appColors.textSecondary
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
         
-        Divider(color = appColors.divider, thickness = 1.dp)
-        
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // New chat button
         Button(
             onClick = onNewChat,
             colors = ButtonDefaults.buttonColors(
                 containerColor = appColors.accent,
-                contentColor = if (appColors.accent == MaterialTheme.colorScheme.primary) Color.White else Color.Black
+                contentColor = appColors.onAccent
             ),
-            shape = RoundedCornerShape(12.dp),
+            shape = CircleShape, // Fully rounded pill shape
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 4.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
-                .height(48.dp)
+                .height(52.dp)
         ) {
             Icon(
                 imageVector = Icons.Rounded.Add,
                 contentDescription = "New chat",
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(22.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = "New Chat",
                 fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp
             )
         }
         
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
         
         // Chat sessions list header
         Text(
-            text = "Recent Chats",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
+            text = "RECENT CHATS",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.2.sp,
             color = appColors.textSecondary,
             modifier = Modifier.padding(horizontal = 20.dp)
         )
         
         Spacer(modifier = Modifier.height(12.dp))
         
-        // Continue with Google button (in chat list area)
+        // Empty state for guest
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -246,52 +276,20 @@ fun UnauthenticatedDrawerContent(
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "Sign in to save your chat history",
+                text = "Sign in to save and view your chat history across devices.",
                 fontSize = 14.sp,
                 color = appColors.textSecondary,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            OutlinedButton(
-                onClick = onSignIn,
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.onSurface
-                ),
-                border = androidx.compose.foundation.BorderStroke(1.dp, appColors.divider),
-                shape = RoundedCornerShape(24.dp),
-                modifier = Modifier
-                    .height(44.dp)
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 12.dp)
-                ) {
-                    // Google logo
-                    Image(
-                        painter = painterResource(id = R.drawable.google),
-                        contentDescription = "Google",
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "Continue with Google",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
         }
     }
 }
 
 @Composable
 fun AuthenticatedDrawerContent(
-    user: com.google.firebase.auth.FirebaseUser,
+    userDisplayName: String,
+    userEmail: String,
+    userPhotoUrl: android.net.Uri?,
     sessions: List<ChatSession>,
     currentSessionId: String?,
     onNewChat: () -> Unit,
@@ -306,61 +304,79 @@ fun AuthenticatedDrawerContent(
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
-        // User profile section - memoized to prevent recomposition
-        key(user.uid) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // User photo
+        // User profile section
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (userPhotoUrl == null) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(appColors.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Person,
+                        contentDescription = "Profile photo",
+                        modifier = Modifier.size(32.dp),
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            } else {
                 val painter = rememberAsyncImagePainter(
-                    model = user.photoUrl
+                    model = userPhotoUrl
                 )
                 Image(
                     painter = painter,
                     contentDescription = "Profile photo",
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(52.dp)
                         .clip(CircleShape)
-                        .border(width = 2.dp, color = appColors.accent, shape = CircleShape)
                 )
-            
-                Spacer(modifier = Modifier.width(12.dp))
-            
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = user.displayName ?: "User",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = user.email ?: "",
-                        fontSize = 12.sp,
-                        color = appColors.textSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            
-                // Settings button
-                IconButton(onClick = onSettingsClick) {
-                    Icon(
-                        imageVector = Icons.Rounded.Settings,
-                        contentDescription = "Settings",
-                        tint = appColors.textSecondary
-                    )
-                }
+            }
+        
+            Spacer(modifier = Modifier.width(16.dp))
+        
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = userDisplayName,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = userEmail,
+                    fontSize = 13.sp,
+                    color = appColors.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        
+            // Settings button
+            IconButton(
+                onClick = onSettingsClick,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(appColors.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Settings,
+                    contentDescription = "Settings",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
         
-        Divider(color = appColors.divider, thickness = 1.dp)
-        
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(16.dp))
         
         // New chat button
         Button(
@@ -369,37 +385,40 @@ fun AuthenticatedDrawerContent(
                 containerColor = appColors.accent,
                 contentColor = if (appColors.accent == MaterialTheme.colorScheme.primary) Color.White else Color.Black
             ),
-            shape = RoundedCornerShape(12.dp),
+            shape = CircleShape, // Fully rounded pill shape
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 4.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
-                .height(48.dp)
+                .height(52.dp)
         ) {
             Icon(
                 imageVector = Icons.Rounded.Add,
                 contentDescription = "New chat",
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(22.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = "New Chat",
                 fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp
             )
         }
         
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
         
         // Chat sessions list
         Text(
-            text = "Recent Chats",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = Color(0xFF8E8E93),
+            text = "RECENT CHATS",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.2.sp,
+            color = appColors.textSecondary,
             modifier = Modifier.padding(horizontal = 20.dp)
         )
         
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         
         // Memoize sorted sessions to prevent re-sorting on every recomposition
         val sortedSessions = remember(sessions) {
@@ -453,25 +472,43 @@ fun ChatSessionItem(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (isSelected) appColors.surfaceVariant else Color.Transparent)
+            .padding(vertical = 4.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (isSelected) appColors.accent.copy(alpha = 0.1f) else Color.Transparent)
             .combinedClickable(
                 onClick = { onClick(sessionId) },
                 onLongClick = { showMenu = true }
             )
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Chat Icon inside a circle
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(if (isSelected) appColors.accent.copy(alpha = 0.2f) else appColors.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Outlined.ChatBubbleOutline,
+                    contentDescription = null,
+                    tint = if (isSelected) appColors.accent else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = sessionTitle,
-                    fontSize = 13.sp,
-                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface,
+                    fontSize = 15.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isSelected) appColors.accent else MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -481,7 +518,7 @@ fun ChatSessionItem(
                 
                 Text(
                     text = formattedDate,
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     color = appColors.textSecondary,
                     maxLines = 1
                 )

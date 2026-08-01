@@ -51,6 +51,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -334,6 +335,10 @@ class MainActivity : AppCompatActivity() {
                                                     drawerState.close()
                                                 }
                                             },
+                                            onNavigateToAuth = {
+                                                coroutineScope.launch { drawerState.close() }
+                                                navController.navigate("auth")
+                                            },
                                             onSettingsClick = {
                                                 coroutineScope.launch {
                                                     drawerState.close()
@@ -358,20 +363,12 @@ class MainActivity : AppCompatActivity() {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(
-                                            Brush.verticalGradient(
-                                                colors = listOf(
-                                                    appColors.topBarBackground, // Solid at top
-                                                    appColors.topBarBackground.copy(alpha = 0.95f), // Slightly transparent
-                                                    appColors.topBarBackground.copy(alpha = 0f) // Transparent at bottom
-                                                )
-                                            )
-                                        )
+                                        .background(Color.Transparent)
                                 ) {
                                     Box(
                                         modifier = Modifier
                                             .statusBarsPadding()
-                                            .height(100.dp)
+                                            .height(64.dp)
                                             .fillMaxWidth()
                                             .padding(horizontal = 12.dp)
                                     ) {
@@ -454,18 +451,15 @@ class MainActivity : AppCompatActivity() {
                                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            // Info icon (Lottie animation)
-                                            val composition by rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.info_card))
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(48.dp)
-                                                    .clickable { navController.navigate("info_screen") },
-                                                contentAlignment = Alignment.Center
+                                            IconButton(
+                                                onClick = { navController.navigate("info_screen") },
+                                                modifier = Modifier.size(48.dp)
                                             ) {
-                                                LottieAnimation(
-                                                    composition = composition,
-                                                    modifier = Modifier.size(48.dp),
-                                                    iterations = LottieConstants.IterateForever
+                                                Icon(
+                                                    imageVector = Icons.Rounded.Info,
+                                                    contentDescription = "Info",
+                                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                                    modifier = Modifier.size(26.dp)
                                                 )
                                             }
                                         }
@@ -569,6 +563,61 @@ class MainActivity : AppCompatActivity() {
                         }
                         composable("info_screen") {
                             InfoSetting() // starting infoTab ui (About section)
+                        }
+                        composable("auth") {
+                            // Listen to user state to pop back stack automatically when logged in (e.g. from Google sign in)
+                            val currentUser by com.daemon.markvii.data.AuthManager.currentUser.collectAsState()
+                            LaunchedEffect(currentUser) {
+                                if (currentUser != null) {
+                                    navController.popBackStack("home", inclusive = false)
+                                }
+                            }
+                            
+                            val isSigningIn by isSigningInState.collectAsState()
+                            
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                com.daemon.markvii.ui.AuthScreen(
+                                    onNavigateBack = { navController.popBackStack() },
+                                    onGoogleSignIn = {
+                                        isSigningInState.value = true
+                                        lifecycleScope.launch {
+                                            try {
+                                                com.daemon.markvii.data.AuthManager.signInWithGoogle(this@MainActivity)
+                                            } catch (e: Exception) {
+                                                isSigningInState.value = false
+                                                Toast.makeText(this@MainActivity, "Google Sign In Failed", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    }
+                                )
+                                
+                                if (isSigningIn) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(Color.Black.copy(alpha = 0.7f))
+                                            .clickable(enabled = false) { },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                                        ) {
+                                            androidx.compose.material3.CircularProgressIndicator(
+                                                modifier = Modifier.size(56.dp),
+                                                color = LocalAppColors.current.accent,
+                                                strokeWidth = 5.dp
+                                            )
+                                            Text(
+                                                text = "Signing in...",
+                                                fontSize = 18.sp,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         })
