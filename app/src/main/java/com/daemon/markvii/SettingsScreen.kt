@@ -158,7 +158,7 @@ fun SettingsScreen(
             
             // Your APIs Section
             Text(
-                text = "Your APIs",
+                text = "Set your custom API keys",
                 fontSize = 14.sp,
                 color = appColors.textSecondary,
                 fontWeight = FontWeight.Medium,
