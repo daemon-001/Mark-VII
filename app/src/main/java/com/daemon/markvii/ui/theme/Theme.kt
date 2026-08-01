@@ -117,12 +117,8 @@ fun MarkVIITheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            // Set status bar color based on theme
-            window.statusBarColor = if (darkTheme) {
-                android.graphics.Color.parseColor("#1A1A2E")
-            } else {
-                android.graphics.Color.parseColor("#F8F8F8")
-            }
+            // Set status bar to transparent to allow edge-to-edge unified look
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }

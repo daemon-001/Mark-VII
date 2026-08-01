@@ -78,6 +78,7 @@ fun DrawerContent(
             .fillMaxHeight()
             .width(300.dp)
             .background(MaterialTheme.colorScheme.surface)
+            .statusBarsPadding()
             .padding(vertical = 16.dp)
     ) {
         // Header
@@ -191,17 +192,27 @@ fun UnauthenticatedDrawerContent(
             }
             
             // Login button
-            Button(
+            FilledTonalButton(
                 onClick = onNavigateToAuth,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = appColors.accent,
-                    contentColor = appColors.onAccent
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = appColors.accent.copy(alpha = 0.15f),
+                    contentColor = appColors.accent
                 ),
                 shape = CircleShape,
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                modifier = Modifier.height(36.dp)
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                modifier = Modifier.height(40.dp)
             ) {
-                Text("Login", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Person,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text("Sign In", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
             
             Spacer(modifier = Modifier.width(8.dp))
@@ -210,7 +221,7 @@ fun UnauthenticatedDrawerContent(
             IconButton(
                 onClick = onSettingsClick,
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(40.dp)
                     .clip(CircleShape)
                     .background(appColors.surfaceVariant.copy(alpha = 0.5f))
             ) {
@@ -218,7 +229,7 @@ fun UnauthenticatedDrawerContent(
                     imageVector = Icons.Rounded.Settings,
                     contentDescription = "Settings",
                     tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
@@ -395,11 +406,13 @@ fun AuthenticatedDrawerContent(
             Icon(
                 imageVector = Icons.Rounded.Add,
                 contentDescription = "New chat",
-                modifier = Modifier.size(22.dp)
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(22.dp),
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = "New Chat",
+                color = MaterialTheme.colorScheme.onPrimary,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 0.5.sp

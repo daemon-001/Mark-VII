@@ -301,17 +301,27 @@ class MainActivity : AppCompatActivity() {
 
                 {
                     var isOnboarding by remember { mutableStateOf(com.daemon.markvii.data.OnboardingPreferences.isFirstRun()) }
+                    var showAuthAfterOnboarding by remember { mutableStateOf(false) }
 
                     if (isOnboarding) {
                         com.daemon.markvii.ui.OnboardingScreen(
                             onFinish = {
                                 com.daemon.markvii.data.OnboardingPreferences.setFirstRunCompleted()
+                                showAuthAfterOnboarding = true
                                 isOnboarding = false
                             }
                         )
                     } else {
                         // for switching between from home screen to infoTab
                         val navController = rememberNavController()
+                        
+                        LaunchedEffect(showAuthAfterOnboarding) {
+                            if (showAuthAfterOnboarding) {
+                                navController.navigate("auth")
+                                showAuthAfterOnboarding = false
+                            }
+                        }
+                        
                         NavHost(navController = navController, startDestination = "home", builder = {
                         composable("home",){
                             // ViewModel needs to be at this scope to be accessible by both topBar and content
@@ -564,7 +574,21 @@ class MainActivity : AppCompatActivity() {
                         composable("info_screen") {
                             InfoSetting() // starting infoTab ui (About section)
                         }
-                        composable("auth") {
+                        composable(
+                            "auth",
+                            enterTransition = {
+                                slideIntoContainer(
+                                    towards = androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Up,
+                                    animationSpec = androidx.compose.animation.core.tween(400)
+                                )
+                            },
+                            exitTransition = {
+                                slideOutOfContainer(
+                                    towards = androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Down,
+                                    animationSpec = androidx.compose.animation.core.tween(400)
+                                )
+                            }
+                        ) {
                             // Listen to user state to pop back stack automatically when logged in (e.g. from Google sign in)
                             val currentUser by com.daemon.markvii.data.AuthManager.currentUser.collectAsState()
                             LaunchedEffect(currentUser) {

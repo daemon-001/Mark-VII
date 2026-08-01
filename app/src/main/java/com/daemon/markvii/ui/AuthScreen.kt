@@ -10,11 +10,12 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Person
@@ -89,8 +90,8 @@ fun AuthScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
-                            imageVector = Icons.Rounded.ArrowBack,
-                            contentDescription = "Back",
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = "Close",
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -111,13 +112,14 @@ fun AuthScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .animateContentSize(),
+                    .animateContentSize()
+                    .padding(top = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Top
             ) {
                 // App Logo / Title
                 Text(
-                    text = if (isLoginMode) "Welcome Back" else "Create Account",
+                    text = if (isLoginMode) "Welcome to Mark VII" else "Create Account",
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
