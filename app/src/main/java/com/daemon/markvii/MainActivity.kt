@@ -384,11 +384,11 @@ class MainActivity : AppCompatActivity() {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(Color.Transparent)
+                                        .background(MaterialTheme.colorScheme.background)
+                                        .statusBarsPadding()
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .statusBarsPadding()
                                             .height(64.dp)
                                             .fillMaxWidth()
                                             .padding(horizontal = 12.dp)
