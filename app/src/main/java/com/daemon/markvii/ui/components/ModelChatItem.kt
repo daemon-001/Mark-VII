@@ -415,7 +415,7 @@ fun ModelChatItem(
                 shape = RoundedCornerShape(20.dp),
                 title = {
                     Text(
-                        text = "Retry with Model",
+                        text = "Retry with other models",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface

@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.ExitToApp
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +29,7 @@ fun SettingsScreen(
     onBackClick: () -> Unit,
     onSignOut: () -> Unit,
     onThemeChanged: (AppTheme) -> Unit = {},
+    onViewUsagesClick: () -> Unit = {},
     isUserAuthenticated: Boolean = false
 ) {
     var selectedTheme by remember { mutableStateOf(ThemePreferences.getTheme()) }
@@ -54,7 +56,7 @@ fun SettingsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = Color.Transparent
                 )
             )
         },
@@ -158,7 +160,7 @@ fun SettingsScreen(
             
             // Your APIs Section
             Text(
-                text = "Your APIs",
+                text = "Set your custom API keys",
                 fontSize = 14.sp,
                 color = appColors.textSecondary,
                 fontWeight = FontWeight.Medium,
@@ -211,6 +213,42 @@ fun SettingsScreen(
                     onVerify = { key -> com.daemon.markvii.data.GroqClient.verifyKey(key) },
                     appColors = appColors
                 )
+                
+                if (isGeminiEnabled || isOpenRouterEnabled || isGroqEnabled) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // View Usages Button
+                    Button(
+                        onClick = onViewUsagesClick,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = appColors.accent,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Info,
+                                contentDescription = "View Usages",
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "View API Usages",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
             }
             if (isUserAuthenticated) {
                 Text(

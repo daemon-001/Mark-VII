@@ -100,28 +100,27 @@ object GroqClient {
     suspend fun verifyKey(keyToVerify: String): Boolean {
         if (keyToVerify.isBlank()) return false
 
-        return try {
-            val request = okhttp3.Request.Builder()
-                .url(BASE_URL + "models")
-                .addHeader("Authorization", "Bearer $keyToVerify")
-                .get()
-                .build()
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val request = okhttp3.Request.Builder()
+                    .url(BASE_URL + "models")
+                    .addHeader("Authorization", "Bearer $keyToVerify")
+                    .get()
+                    .build()
 
-            val client = OkHttpClient.Builder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(10, TimeUnit.SECONDS)
-                .build()
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(10, TimeUnit.SECONDS)
+                    .readTimeout(10, TimeUnit.SECONDS)
+                    .build()
 
-            val response = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                client.newCall(request).execute()
+                val response = client.newCall(request).execute()
+                val isSuccess = response.isSuccessful
+                response.close()
+                isSuccess
+            } catch (e: Exception) {
+                e.printStackTrace()
+                false
             }
-
-            val isSuccess = response.isSuccessful
-            response.close()
-            isSuccess
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
         }
     }
 }

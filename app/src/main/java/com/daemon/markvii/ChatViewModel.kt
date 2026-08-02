@@ -293,7 +293,7 @@ class ChatViewModel : ViewModel() {
                     ApiProvider.GEMINI -> {
                         // Use Gemini API with streaming
                         val streamingChat = Chat(
-                            prompt = "",
+                            prompt = if (isRetry) "Searching model..." else "",
                             bitmap = null,
                             isFromUser = false,
                             modelUsed = ChatData.selected_model,
@@ -334,8 +334,9 @@ class ChatViewModel : ViewModel() {
                                         val updatedList = state.chatList.toMutableList()
                                         if (updatedList.isNotEmpty()) {
                                             val currentResponse = updatedList[0]
+                                            val newPrompt = if (currentResponse.prompt == "Searching model...") chunk else currentResponse.prompt + chunk
                                             updatedList[0] = currentResponse.copy(
-                                                prompt = currentResponse.prompt + chunk,
+                                                prompt = newPrompt,
                                                 isStreaming = true
                                             )
                                         }
@@ -375,7 +376,7 @@ class ChatViewModel : ViewModel() {
                     ApiProvider.OPENROUTER -> {
                         // Use OpenRouter API with streaming and conversation history
                         val streamingChat = Chat(
-                            prompt = "",
+                            prompt = if (isRetry) "Searching model..." else "",
                             bitmap = null,
                             isFromUser = false,
                             modelUsed = ChatData.selected_model,
@@ -412,8 +413,9 @@ class ChatViewModel : ViewModel() {
                                     val updatedList = state.chatList.toMutableList()
                                     if (updatedList.isNotEmpty()) {
                                         val currentResponse = updatedList[0]
+                                        val newPrompt = if (currentResponse.prompt == "Searching model...") chunk else currentResponse.prompt + chunk
                                         updatedList[0] = currentResponse.copy(
-                                            prompt = currentResponse.prompt + chunk,
+                                            prompt = newPrompt,
                                             isStreaming = true
                                         )
                                     }
@@ -445,7 +447,7 @@ class ChatViewModel : ViewModel() {
                     ApiProvider.GROQ -> {
                         // Use Groq API with streaming
                         val streamingChat = Chat(
-                            prompt = "",
+                            prompt = if (isRetry) "Searching model..." else "",
                             bitmap = null,
                             isFromUser = false,
                             modelUsed = ChatData.selected_model,
@@ -481,8 +483,9 @@ class ChatViewModel : ViewModel() {
                                     val updatedList = state.chatList.toMutableList()
                                     if (updatedList.isNotEmpty()) {
                                         val currentResponse = updatedList[0]
+                                        val newPrompt = if (currentResponse.prompt == "Searching model...") chunk else currentResponse.prompt + chunk
                                         updatedList[0] = currentResponse.copy(
-                                            prompt = currentResponse.prompt + chunk,
+                                            prompt = newPrompt,
                                             isStreaming = true
                                         )
                                     }
@@ -595,6 +598,16 @@ class ChatViewModel : ViewModel() {
         
         val errorCode = if (parts.size == 2) parts[0] else "UNKNOWN_ERROR"
         val errorDetails = if (parts.size == 2) parts[1] else errorMessage
+        
+        if (errorCode == "MODEL_404_RETRY") {
+            // Retry automatically in the background
+            if (bitmap != null) {
+                getResponseWithImage(prompt, bitmap)
+            } else {
+                getResponse(prompt, isRetry = true)
+            }
+            return
+        }
         
         // Format error message for display in chat
         val formattedError = buildString {

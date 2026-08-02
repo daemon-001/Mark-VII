@@ -7,9 +7,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -52,239 +59,212 @@ import com.daemon.markvii.ui.theme.LocalAppColors
 fun InfoSetting() {
     val appColors = LocalAppColors.current
     val uriHandler = LocalUriHandler.current
-    var isVisible by remember { mutableStateOf(false) }
-
-    // Trigger animation on composition
-    LaunchedEffect(Unit) {
-        isVisible = true
-    }
-
     Column(
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .systemBarsPadding()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 18.dp),
+            .padding(horizontal = 16.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
 
-        // Header card with logo and title
-        AnimatedVisibility(
-            visible = isVisible,
-            enter = fadeIn(animationSpec = tween(300))
-        ) {
+        // Card 1: App Info
         Surface(
             tonalElevation = 2.dp,
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp)
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
             Column(
-                modifier = Modifier
-                    .padding(18.dp)
+                modifier = Modifier.padding(20.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    AboutAnimation(modifier = Modifier.size(64.dp))
+                    Image(
+                        painter = painterResource(id = R.drawable.mini_logo),
+                        contentDescription = "App Logo",
+                        modifier = Modifier.size(72.dp)
+                    )
                     Column {
-                        Text(
-                            text = "MARK VII",
-                            fontSize = 22.sp,
-                            fontFamily = FontFamily(Font(R.font.typographica)),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.Bold
+                            Text(
+                                text = "MARK VI I",
+                                fontSize = 24.sp,
+                                fontFamily = FontFamily(Font(R.font.typographica)),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Next-generation multi-model AI assistant",
+                                fontSize = 14.sp,
+                                color = appColors.textSecondary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Surface(
+                                color = appColors.surfaceVariant.copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = "v3.3.2 (30302)",
+                                    fontSize = 12.sp,
+                                    color = appColors.textSecondary,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Text(
+                        text = "About Mark VII",
+                        fontSize = 18.sp,
+                        fontFamily = FontFamily(Font(R.font.typographica)),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    Text(
+                        text = "Mark VII provides the ultimate experience of using multiple industry-leading AI models all in one place. Seamlessly switch between models from Google, OpenAI, Anthropic, and more within a single unified interface. Enjoy advanced features like voice interaction, real-time vision capabilities, and effortless PDF exports to supercharge your productivity.",
+                        fontSize = 14.sp,
+                        color = appColors.textPrimary,
+                        fontFamily = FontFamily.Default,
+                        lineHeight = 20.sp
+                    )
+                }
+            }
+
+        // Card 2: Open Source
+        Surface(
+            tonalElevation = 2.dp,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        androidx.compose.material3.Icon(
+                            imageVector = Icons.Rounded.Favorite,
+                            contentDescription = "Open Source",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
                         )
                         Text(
-                            text = "Smart multi-provider AI assistant",
-                            fontSize = 13.sp,
-                            color = appColors.textSecondary
+                            text = "Open Source",
+                            fontFamily = FontFamily(Font(R.font.typographica)),
+                            fontSize = 18.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                     }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "About Mark VII",
-                    fontSize = 20.sp,
-                    fontFamily = FontFamily(Font(R.font.typographica)),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-
-                Text(
-                    text = "Mark VII is a powerful multi-provider AI assistant for Android that brings together the best AI models from Google, OpenAI, Anthropic, and more. Experience seamless conversations with advanced features including voice input, vision capabilities, PDF export, and intelligent context management. Switch between models on-the-fly to get the perfect response for any task.",
-                    fontSize = 14.sp,
-                    color = appColors.textPrimary,
-                    fontFamily = FontFamily.Default,
-                    lineHeight = 18.sp
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Developer info
-                Column(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
                     Text(
-                        text = "About Developer",
-                        fontFamily = FontFamily(Font(R.font.typographica)),
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        modifier = Modifier.padding(top = 4.dp),
-                        text = "Developed by Nitesh (a.k.a Daemon)",
-                        fontFamily = FontFamily(Font(R.font.merienda_regular)),
-                        fontSize = 13.sp,
+                        text = "This is a proud open-source project! We believe in transparent development and community collaboration. You can view the full source code, report issues, or contribute to the project on our GitHub repository.",
+                        fontSize = 14.sp,
                         lineHeight = 20.sp,
                         color = appColors.textPrimary,
                     )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // App version and GitHub link
-                Column(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = "App Version: v3.3.1 (30310)",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = appColors.textSecondary,
-                    )
-
-                    val annotatedString = buildAnnotatedString {
-                        pushStringAnnotation(
-                            tag = "URL",
-                            annotation = "https://github.com/daemon-001/Mark-VII"
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = { uriHandler.openUri("https://github.com/daemon-001/Mark-VII") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        androidx.compose.material3.Icon(
+                            imageVector = Icons.Rounded.Code,
+                            contentDescription = "Code",
+                            modifier = Modifier.size(18.dp)
                         )
-                        withStyle(
-                            style = SpanStyle(
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 14.sp,
-                                textDecoration = TextDecoration.Underline
-                            )
-                        ) {
-                            append("GitHub Repository")
-                        }
-                        pop()
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("View GitHub Repository", fontWeight = FontWeight.Medium)
                     }
-
-                    ClickableText(
-                        text = annotatedString,
-                        modifier = Modifier.padding(top = 4.dp),
-                        onClick = { offset ->
-                            annotatedString.getStringAnnotations(
-                                tag = "URL",
-                                start = offset,
-                                end = offset
-                            ).firstOrNull()?.let { annotation ->
-                                uriHandler.openUri(annotation.item)
-                            }
-                        }
-                    )
                 }
             }
-        }
-        } // End AnimatedVisibility for header card
 
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Contact card
-        AnimatedVisibility(
-            visible = isVisible,
-            enter = fadeIn(animationSpec = tween(300))
-        ) {
+        // Card 3: Contact & Developer
         Surface(
             tonalElevation = 2.dp,
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp)
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
             Column(
-                modifier = Modifier.padding(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Contact Us",
-                    fontFamily = FontFamily(Font(R.font.typographica)),
-                    fontSize = 18.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-
-                Row(
-                    modifier = Modifier.padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    IconButton(
-                        onClick = { uriHandler.openUri("https://www.linkedin.com/in/daemon001") },
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(appColors.surfaceVariant)
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.linkedin),
-                            contentDescription = "LinkedIn",
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
+                    Text(
+                        text = "Developer Contact",
+                        fontFamily = FontFamily(Font(R.font.typographica)),
+                        fontSize = 18.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
 
-                    IconButton(
-                        onClick = { uriHandler.openUri("https://github.com/daemon-001") },
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(appColors.surfaceVariant)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.github),
-                            contentDescription = "GitHub",
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
+                        IconButton(
+                            onClick = { uriHandler.openUri("https://www.linkedin.com/in/daemon001") },
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(appColors.surfaceVariant)
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.linkedin),
+                                contentDescription = "LinkedIn",
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
 
-                    IconButton(
-                        onClick = { uriHandler.openUri("https://www.instagram.com/mustbe_daemon") },
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(appColors.surfaceVariant)
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.instagram),
-                            contentDescription = "Instagram",
-                            modifier = Modifier.size(28.dp)
-                        )
+                        IconButton(
+                            onClick = { uriHandler.openUri("https://github.com/daemon-001") },
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(appColors.surfaceVariant)
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.github),
+                                contentDescription = "GitHub",
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { uriHandler.openUri("https://devwizpro.com/") },
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(appColors.surfaceVariant)
+                        ) {
+                            androidx.compose.material3.Icon(
+                                imageVector = Icons.Rounded.Language,
+                                contentDescription = "Website",
+                                modifier = Modifier.size(28.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
-        }
-        } // End AnimatedVisibility for contact card
-
-        Spacer(modifier = Modifier.height(8.dp))
-
+        
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }
 
-@Composable
-fun AboutAnimation(modifier: Modifier = Modifier) {
-    val composition by rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.aboutapp))
-    LottieAnimation(
-        composition = composition,
-        modifier = modifier.size(100.dp),
-        iterations = LottieConstants.IterateForever
-    )
-}
+
 
 

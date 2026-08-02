@@ -26,6 +26,7 @@ data class AppColors(
     val textPrimary: Color,
     val textSecondary: Color,
     val accent: Color,
+    val onAccent: Color,
     val error: Color,
     val inputBackground: Color,
     val divider: Color
@@ -38,6 +39,7 @@ private val DarkAppColors = AppColors(
     textPrimary = DarkTextPrimary,
     textSecondary = DarkTextSecondary,
     accent = DarkPrimary,
+    onAccent = Color.White,
     error = DarkError,
     inputBackground = DarkSurfaceTertiary,
     divider = DarkSurfaceTertiary
@@ -50,6 +52,7 @@ private val LightAppColors = AppColors(
     textPrimary = LightTextPrimary,
     textSecondary = LightTextSecondary,
     accent = LightPrimary,
+    onAccent = Color.White,
     error = LightError,
     inputBackground = LightSurfaceVariant,
     divider = LightSurfaceTertiary
@@ -87,7 +90,7 @@ private val LightColorScheme = lightColorScheme(
 fun MarkVIITheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = false, // Disabled to use custom color scheme
+    dynamicColor: Boolean = true, // Enabled to use device monet colors
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -100,18 +103,22 @@ fun MarkVIITheme(
         else -> LightColorScheme
     }
     
-    val appColors = if (darkTheme) DarkAppColors else LightAppColors
+    val baseAppColors = if (darkTheme) DarkAppColors else LightAppColors
+    val appColors = if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        baseAppColors.copy(
+            accent = colorScheme.primary,
+            onAccent = colorScheme.onPrimary
+        )
+    } else {
+        baseAppColors
+    }
     
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            // Set status bar color based on theme
-            window.statusBarColor = if (darkTheme) {
-                android.graphics.Color.parseColor("#1A1A2E")
-            } else {
-                android.graphics.Color.parseColor("#F8F8F8")
-            }
+            // Set status bar to transparent to allow edge-to-edge unified look
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }

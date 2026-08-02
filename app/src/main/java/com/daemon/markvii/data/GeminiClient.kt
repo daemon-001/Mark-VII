@@ -224,20 +224,31 @@ object GeminiClient {
         
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                // Use direct HTTP request to verify key avoid SDK initialization issues
-                val url = java.net.URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash?key=$keyToVerify")
-                val connection = url.openConnection() as java.net.HttpURLConnection
-                connection.requestMethod = "GET"
-                connection.connectTimeout = 10000
-                connection.readTimeout = 10000
+                // Use the /models endpoint to verify the key without depending on a specific model
+                val url = "https://generativelanguage.googleapis.com/v1beta/models?key=$keyToVerify"
+                val request = okhttp3.Request.Builder()
+                    .url(url)
+                    .get()
+                    .build()
                 
-                val responseCode = connection.responseCode
-                connection.disconnect()
+                val client = okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+                    
+                val response = client.newCall(request).execute()
+                val isSuccess = response.isSuccessful
                 
-                // 200 OK means the key is valid and has access to the model
-                responseCode == 200
+                if (!isSuccess) {
+                    val responseBody = response.body?.string()
+                    Log.e(TAG, "Key verification failed with code: ${response.code}, body: $responseBody")
+                }
+                
+                response.close()
+                
+                isSuccess
             } catch (e: Exception) {
-                Log.e(TAG, "Key verification failed: ${e.message}", e)
+                Log.e(TAG, "Key verification exception: ${e.message}", e)
                 false
             }
         }

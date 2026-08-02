@@ -8,11 +8,18 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Headers
 import retrofit2.http.POST
+import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
  * OpenRouter API Data Models
  */
+data class OpenRouterKeyInfo(
+    val label: String?,
+    val usage: Double,
+    val limit: Double?,
+    val isFreeTier: Boolean
+)
 data class OpenRouterRequest(
     val model: String,
     val messages: List<Message>,
@@ -168,29 +175,70 @@ object OpenRouterClient {
     suspend fun verifyKey(keyToVerify: String): Boolean {
         if (keyToVerify.isBlank()) return false
         
-        return try {
-            val request = okhttp3.Request.Builder()
-                .url(BASE_URL + "auth/key")
-                .addHeader("Authorization", "Bearer $keyToVerify")
-                .get()
-                .build()
-            
-            // Use a new client to avoid interceptors interfering
-            val client = OkHttpClient.Builder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(10, TimeUnit.SECONDS)
-                .build()
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val request = okhttp3.Request.Builder()
+                    .url(BASE_URL + "auth/key")
+                    .addHeader("Authorization", "Bearer $keyToVerify")
+                    .get()
+                    .build()
                 
-            val response = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                client.newCall(request).execute()
+                // Use a new client to avoid interceptors interfering
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(10, TimeUnit.SECONDS)
+                    .readTimeout(10, TimeUnit.SECONDS)
+                    .build()
+                    
+                val response = client.newCall(request).execute()
+                val isSuccess = response.isSuccessful
+                response.close()
+                isSuccess
+            } catch (e: Exception) {
+                e.printStackTrace()
+                false
             }
-            
-            val isSuccess = response.isSuccessful
-            response.close()
-            isSuccess
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
+        }
+    }
+
+    /**
+     * Get API key usage statistics
+     */
+    suspend fun getKeyUsage(key: String): OpenRouterKeyInfo? {
+        if (key.isBlank()) return null
+        
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val request = okhttp3.Request.Builder()
+                    .url(BASE_URL + "auth/key")
+                    .addHeader("Authorization", "Bearer $key")
+                    .get()
+                    .build()
+                
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(10, TimeUnit.SECONDS)
+                    .readTimeout(10, TimeUnit.SECONDS)
+                    .build()
+                    
+                val response = client.newCall(request).execute()
+                val isSuccess = response.isSuccessful
+                val responseBody = response.body?.string()
+                response.close()
+                
+                if (isSuccess && responseBody != null) {
+                    val jsonObject = JSONObject(responseBody).getJSONObject("data")
+                    val label = jsonObject.optString("label", "Unknown Key")
+                    val usage = jsonObject.optDouble("usage", 0.0)
+                    val limit = if (jsonObject.isNull("limit")) null else jsonObject.optDouble("limit")
+                    val isFreeTier = jsonObject.optBoolean("is_free_tier", false)
+                    
+                    OpenRouterKeyInfo(label, usage, limit, isFreeTier)
+                } else {
+                    null
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
         }
     }
 }
