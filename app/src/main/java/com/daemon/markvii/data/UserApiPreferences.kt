@@ -18,6 +18,8 @@ object UserApiPreferences {
     private const val KEY_GROQ_API_KEY = "groq_api_key"
     private const val KEY_GROQ_ENABLED = "groq_enabled"
     
+    private const val KEY_HAS_SEEN_API_KEY_WARNING = "has_seen_api_key_warning"
+    
     private lateinit var prefs: SharedPreferences
     
     // Gemini Config
@@ -41,6 +43,10 @@ object UserApiPreferences {
     private val _isGroqKeyEnabled = MutableStateFlow(false)
     val isGroqKeyEnabled: StateFlow<Boolean> = _isGroqKeyEnabled.asStateFlow()
     
+    // UI Warnings
+    private val _hasSeenApiKeyWarning = MutableStateFlow(false)
+    val hasSeenApiKeyWarning: StateFlow<Boolean> = _hasSeenApiKeyWarning.asStateFlow()
+    
     fun init(context: Context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         
@@ -53,6 +59,8 @@ object UserApiPreferences {
 
         _groqApiKey.value = prefs.getString(KEY_GROQ_API_KEY, "") ?: ""
         _isGroqKeyEnabled.value = prefs.getBoolean(KEY_GROQ_ENABLED, false)
+        
+        _hasSeenApiKeyWarning.value = prefs.getBoolean(KEY_HAS_SEEN_API_KEY_WARNING, false)
     }
     
     fun setGeminiApiKey(key: String) {
@@ -83,6 +91,11 @@ object UserApiPreferences {
     fun setGroqKeyEnabled(enabled: Boolean) {
         _isGroqKeyEnabled.value = enabled
         prefs.edit().putBoolean(KEY_GROQ_ENABLED, enabled).apply()
+    }
+
+    fun setHasSeenApiKeyWarning(hasSeen: Boolean) {
+        _hasSeenApiKeyWarning.value = hasSeen
+        prefs.edit().putBoolean(KEY_HAS_SEEN_API_KEY_WARNING, hasSeen).apply()
     }
 }
 

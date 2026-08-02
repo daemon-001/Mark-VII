@@ -128,6 +128,23 @@ fun UsagesScreen(onBackClick: () -> Unit) {
                                 fontSize = 14.sp
                             )
                         }
+                        
+                        OutlinedButton(
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://openrouter.ai/activity"))
+                                context.startActivity(intent)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("View on OpenRouter", color = MaterialTheme.colorScheme.onSurface)
+                            Spacer(Modifier.width(8.dp))
+                            Icon(
+                                imageVector = Icons.Rounded.OpenInNew,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
             }
@@ -170,7 +187,7 @@ fun UsagesScreen(onBackClick: () -> Unit) {
                         }
                         OutlinedButton(
                             onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/app/plan_information"))
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/app/usage"))
                                 context.startActivity(intent)
                             },
                             modifier = Modifier.fillMaxWidth()
@@ -226,7 +243,7 @@ fun UsagesScreen(onBackClick: () -> Unit) {
                         }
                         OutlinedButton(
                             onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://console.groq.com/settings/billing"))
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://console.groq.com/dashboard/usage"))
                                 context.startActivity(intent)
                             },
                             modifier = Modifier.fillMaxWidth()

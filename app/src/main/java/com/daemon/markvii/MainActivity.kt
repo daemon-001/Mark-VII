@@ -334,6 +334,16 @@ class MainActivity : AppCompatActivity() {
                             val chatState by chaViewModel.chatState.collectAsState()
                             val appColors = LocalAppColors.current // Get theme colors
                             
+                            val hasSeenApiKeyWarning by com.daemon.markvii.data.UserApiPreferences.hasSeenApiKeyWarning.collectAsState()
+                            var showApiKeyWarningDialog by remember { mutableStateOf(false) }
+
+                            LaunchedEffect(hasSeenApiKeyWarning) {
+                                if (!hasSeenApiKeyWarning) {
+                                    kotlinx.coroutines.delay(2000)
+                                    showApiKeyWarningDialog = true
+                                }
+                            }
+                            
                             Box(modifier = Modifier.fillMaxSize()) {
                             ModalNavigationDrawer(
                                 drawerState = drawerState,
@@ -374,11 +384,11 @@ class MainActivity : AppCompatActivity() {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(Color.Transparent)
+                                        .background(MaterialTheme.colorScheme.background)
+                                        .statusBarsPadding()
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .statusBarsPadding()
                                             .height(64.dp)
                                             .fillMaxWidth()
                                             .padding(horizontal = 12.dp)
@@ -578,6 +588,44 @@ class MainActivity : AppCompatActivity() {
                                         )
                                     }
                                 }
+                            }
+                            
+                            // API Key Warning Dialog
+                            if (showApiKeyWarningDialog) {
+                                AlertDialog(
+                                    onDismissRequest = { 
+                                        showApiKeyWarningDialog = false 
+                                        com.daemon.markvii.data.UserApiPreferences.setHasSeenApiKeyWarning(true)
+                                    },
+                                    title = { Text("API Quota Notice", fontWeight = FontWeight.Bold) },
+                                    text = { 
+                                        Text("Mark-VII uses shared developer API keys by default. You might encounter \"quota exceeded\" errors if usage is high.\n\nFor a faster and uninterrupted experience, it is highly recommended to configure your own personal API keys in the Settings.") 
+                                    },
+                                    confirmButton = {
+                                        TextButton(
+                                            onClick = {
+                                                showApiKeyWarningDialog = false
+                                                com.daemon.markvii.data.UserApiPreferences.setHasSeenApiKeyWarning(true)
+                                                showSettings = true
+                                            }
+                                        ) {
+                                            Text("Settings")
+                                        }
+                                    },
+                                    dismissButton = {
+                                        TextButton(
+                                            onClick = {
+                                                showApiKeyWarningDialog = false
+                                                com.daemon.markvii.data.UserApiPreferences.setHasSeenApiKeyWarning(true)
+                                            }
+                                        ) {
+                                            Text("OK")
+                                        }
+                                    },
+                                    containerColor = appColors.surfaceVariant,
+                                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                                    textContentColor = appColors.textSecondary
+                                )
                             }
                             
                             } // Box
