@@ -3,6 +3,24 @@
 All notable changes to the Mark VII project are documented in this file.
 
 ---
+## v3.3.2 (30302)
+August 2, 2026
+
+### API & Usage Management
+- **API Usage Screen**: Introduced a dedicated API Usage screen for tracking personal API key limits.
+- **Quota Warnings & Portal Links**: Added proactive quota warnings and direct links to API usage portals (Gemini AI Studio, Groq Console, OpenRouter Activity).
+- **Key Verification Feedback**: Improved UI feedback during API key verification processes.
+
+### UI/UX & Onboarding Refinements
+- **UI Polish**: Polished onboarding flows and refined various app UI surfaces for a cleaner experience.
+- **Top Bar UI Fix**: Fixed a visual bug in the main chat screen where scrollable chat messages were improperly overlapping the top app bar and system status bar.
+- **App Icon Update**: Updated the main application icon.
+
+### Authentication & Settings
+- **Auth Screen & Email Flow**: Added a dedicated Authentication screen and implemented an email authentication flow.
+- **Copy Refinements**: Refined the textual copy across the settings page and retry dialogs for improved clarity.
+
+---
 ## v3.3.1 (30310)
 April 20, 2026 20:26:19 +0530
 
