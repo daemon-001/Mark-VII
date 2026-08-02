@@ -329,6 +329,7 @@ class MainActivity : AppCompatActivity() {
                             val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                             val coroutineScope = rememberCoroutineScope()
                             var showSettings by remember { mutableStateOf(false) } // Settings screen state
+                            var showUsages by remember { mutableStateOf(false) } // Usages screen state
                             val isSigningIn by isSigningInState.collectAsState() // Sign-in loading state from Activity
                             val chatState by chaViewModel.chatState.collectAsState()
                             val appColors = LocalAppColors.current // Get theme colors
@@ -536,7 +537,18 @@ class MainActivity : AppCompatActivity() {
                                         showSettings = false
                                     },
                                     onThemeChanged = { /* Theme change is handled via StateFlow */ },
+                                    onViewUsagesClick = { showUsages = true },
                                     isUserAuthenticated = chatState.currentUser != null
+                                )
+                            }
+                            
+                            // Usages screen overlay
+                            if (showUsages) {
+                                androidx.activity.compose.BackHandler {
+                                    showUsages = false
+                                }
+                                com.daemon.markvii.ui.UsagesScreen(
+                                    onBackClick = { showUsages = false }
                                 )
                             }
                             

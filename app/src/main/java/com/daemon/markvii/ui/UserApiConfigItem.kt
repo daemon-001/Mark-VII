@@ -51,10 +51,12 @@ fun UserApiConfigItem(
     val coroutineScope = rememberCoroutineScope()
     var isLoading by remember { mutableStateOf(false) }
     var isError by remember { mutableStateOf(false) }
+    var isSuccess by remember { mutableStateOf(false) }
     
     // Reset error when key changes
     LaunchedEffect(apiKey) {
         if (isError) isError = false
+        if (isSuccess) isSuccess = false
     }
     
     Column(
@@ -79,6 +81,8 @@ fun UserApiConfigItem(
             isError = isError,
             supportingText = if (isError) {
                 { Text("Invalid API Key", color = appColors.error, fontSize = 12.sp) }
+            } else if (isSuccess) {
+                { Text("API Key Verified", color = Color(0xFF4CAF50), fontSize = 12.sp) }
             } else null,
             trailingIcon = {
                 if (isLoading) {
@@ -99,6 +103,7 @@ fun UserApiConfigItem(
                                     val isValid = onVerify(apiKey.trim())
                                     isLoading = false
                                     if (isValid) {
+                                        isSuccess = true
                                         onEnabledChanged(true)
                                     } else {
                                         isError = true

@@ -108,7 +108,7 @@ fun InfoSetting() {
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text(
-                                    text = "v3.3.1 (30310)",
+                                    text = "v3.3.2 (30302)",
                                     fontSize = 12.sp,
                                     color = appColors.textSecondary,
                                     fontWeight = FontWeight.SemiBold,
