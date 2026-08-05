@@ -55,7 +55,10 @@ object FirebaseConfigManager {
     /**
      * Initialize and fetch configuration from Firebase
      */
-    suspend fun initialize() {
+    suspend fun initialize(forceRefresh: Boolean = false) {
+        if (!forceRefresh && _configState.value is ConfigState.Success) {
+            return
+        }
         try {
             _configState.value = ConfigState.Loading
             

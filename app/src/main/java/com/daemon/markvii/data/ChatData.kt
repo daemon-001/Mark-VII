@@ -243,11 +243,17 @@ object ChatData {
                 val exceptionModels = FirebaseConfigManager.exceptionModels.value
                 val cacheKey = "$openRouterKey|${exceptionModels.hashCode()}"
                 
-                val openRouterModels = fetchFreeModels()
-                if (openRouterModels.isNotEmpty()) {
-                    cachedFreeModels = openRouterModels
+                val cached = ModelsCacheManager.getOpenRouterModels(cacheKey)
+                if (cached != null && cached.isNotEmpty()) {
+                    cachedFreeModels = cached
                     cachedFreeModelsKey = cacheKey
-                    ModelsCacheManager.saveOpenRouterModels(openRouterModels, cacheKey)
+                } else {
+                    val openRouterModels = fetchFreeModels()
+                    if (openRouterModels.isNotEmpty()) {
+                        cachedFreeModels = openRouterModels
+                        cachedFreeModelsKey = cacheKey
+                        ModelsCacheManager.saveOpenRouterModels(openRouterModels, cacheKey)
+                    }
                 }
             }
             
@@ -258,11 +264,17 @@ object ChatData {
             val keyToUse = if (isUserGroqEnabled && userGroqKey.isNotBlank()) userGroqKey else firebaseGroqApiKey
             
             if (keyToUse.isNotBlank()) {
-                val groqModelsList = fetchGroqModels()
-                if (groqModelsList.isNotEmpty()) {
-                    cachedGroqModels = groqModelsList
+                val cachedGroq = ModelsCacheManager.getGroqModels(keyToUse)
+                if (cachedGroq != null && cachedGroq.isNotEmpty()) {
+                    cachedGroqModels = cachedGroq
                     cachedGroqModelsKey = keyToUse
-                    ModelsCacheManager.saveGroqModels(groqModelsList, keyToUse)
+                } else {
+                    val groqModelsList = fetchGroqModels()
+                    if (groqModelsList.isNotEmpty()) {
+                        cachedGroqModels = groqModelsList
+                        cachedGroqModelsKey = keyToUse
+                        ModelsCacheManager.saveGroqModels(groqModelsList, keyToUse)
+                    }
                 }
             }
         } catch (e: Exception) {

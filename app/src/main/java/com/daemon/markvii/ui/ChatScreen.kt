@@ -81,7 +81,7 @@ fun ChatScreen(
     val chatState = chaViewModel.chatState.collectAsState().value
     val context = LocalContext.current
     // State for loading free models from OpenRouter and Gemini
-    var isLoadingModels by remember { mutableStateOf(ChatData.cachedFreeModels.isEmpty()) }
+    var isLoadingModels by remember { mutableStateOf(false) }
     var reloadTrigger by remember { mutableIntStateOf(0) }
     var freeModels by remember { mutableStateOf<List<ModelInfo>>(ChatData.cachedFreeModels) }
 
@@ -111,12 +111,6 @@ fun ChatScreen(
     LaunchedEffect(Unit) {
         FirebaseConfigManager.initialize()
     }
-    
-    // Verify Firebase keys first
-    LaunchedEffect(firebaseApiKey, exceptionModels) {
-        // This effect handles model loading based on firebase key
-        // Actual key usage for generation is handled below
-    }
 
     // Observe User API Preferences
     val userGeminiKey by com.daemon.markvii.data.UserApiPreferences.geminiApiKey.collectAsState()
@@ -128,17 +122,44 @@ fun ChatScreen(
     val userGroqKey by com.daemon.markvii.data.UserApiPreferences.groqApiKey.collectAsState()
     val isUserGroqEnabled by com.daemon.markvii.data.UserApiPreferences.isGroqKeyEnabled.collectAsState()
 
-    var globalModels by remember { mutableStateOf<List<com.daemon.markvii.data.GlobalModelInfo>>(emptyList()) }
     var isGlobalModelSelectorExpanded by remember { mutableStateOf(false) }
     
-    LaunchedEffect(firebaseApiKey, firebaseGroqApiKey, exceptionModels, userGroqKey, isUserGroqEnabled, ChatData.cachedFreeModels, ChatData.cachedGroqModels) {
-        val modelsCacheKey = if (firebaseApiKey.isNotEmpty()) "$firebaseApiKey|${exceptionModels.hashCode()}_v2" else null
-        val groqCacheKey = if (isUserGroqEnabled && userGroqKey.isNotBlank()) userGroqKey else firebaseGroqApiKey
-        val finalGroqCacheKey = if (groqCacheKey.isNotEmpty()) groqCacheKey else null
-        
-        globalModels = ChatData.getAllGlobalModels(modelsCacheKey, finalGroqCacheKey)
+    // Derive global models synchronously from geminiModels, freeModels, and groqModels
+    val globalModels = remember(geminiModels, freeModels, groqModels) {
+        val geminiList = geminiModels.map {
+            com.daemon.markvii.data.GlobalModelInfo(
+                apiModel = it.apiModel,
+                displayName = it.displayName,
+                provider = ApiProvider.GEMINI,
+                isPro = it.isPro,
+                isPaid = false,
+                isAvailable = it.isAvailable
+            )
+        }
+        val openRouterList = freeModels.map {
+            com.daemon.markvii.data.GlobalModelInfo(
+                apiModel = it.apiModel,
+                displayName = it.displayName,
+                provider = ApiProvider.OPENROUTER,
+                isPro = it.isPro,
+                isPaid = it.isPaid,
+                isAvailable = it.isAvailable,
+                created = it.created
+            )
+        }
+        val groqList = groqModels.map {
+            com.daemon.markvii.data.GlobalModelInfo(
+                apiModel = it.apiModel,
+                displayName = it.displayName,
+                provider = ApiProvider.GROQ,
+                isPro = it.isPro,
+                isPaid = it.isPaid,
+                isAvailable = it.isAvailable,
+                created = it.created
+            )
+        }
+        geminiList + openRouterList + groqList
     }
-
 
     // Update API keys - Prioritize User Keys
     LaunchedEffect(firebaseApiKey, userOpenRouterKey, isUserOpenRouterEnabled) {
@@ -186,41 +207,57 @@ fun ChatScreen(
             // Build a cache key that changes when either API key or exception models change
             val modelsCacheKey = "$firebaseApiKey|${exceptionModels.hashCode()}"
 
-            // If we already have cached models with the same cache key, reuse them
+            // If we already have cached models with the same cache key in memory, reuse them
             if (ChatData.cachedFreeModels.isNotEmpty() && ChatData.cachedFreeModelsKey == modelsCacheKey) {
                 // Models already cached, use them directly without showing loading
                 freeModels = ChatData.cachedFreeModels
                 isLoadingModels = false
             } else {
-                // Only show loading if we need to fetch new models
-                isLoadingModels = true
-                try {
-                    // Use the convenience method which caches the result in ChatData
-                    freeModels = ChatData.getOrFetchFreeModels(modelsCacheKey)
-                    if (freeModels.isEmpty()) {
-                        modelsLoadError = "No free models available"
-                    }
-                } catch (e: Exception) {
-                    modelsLoadError = "Failed to load models: ${e.message}"
-                } finally {
+                // Check disk cache first before showing loading dialog
+                val diskModels = com.daemon.markvii.data.ModelsCacheManager.getOpenRouterModels(modelsCacheKey)
+                if (diskModels != null && diskModels.isNotEmpty()) {
+                    ChatData.cachedFreeModels = diskModels
+                    ChatData.cachedFreeModelsKey = modelsCacheKey
+                    freeModels = diskModels
                     isLoadingModels = false
+                } else {
+                    // Only show loading if we need to fetch new models from network
+                    isLoadingModels = true
+                    try {
+                        // Use the convenience method which caches the result in ChatData
+                        freeModels = ChatData.getOrFetchFreeModels(modelsCacheKey)
+                        if (freeModels.isEmpty()) {
+                            modelsLoadError = "No free models available"
+                        }
+                    } catch (e: Exception) {
+                        modelsLoadError = "Failed to load models: ${e.message}"
+                    } finally {
+                        isLoadingModels = false
+                    }
                 }
             }
         }
     }
 
     // Load Groq models when Groq key changes (Firebase or user override)
-    LaunchedEffect(firebaseGroqApiKey, userGroqKey, isUserGroqEnabled) {
+    LaunchedEffect(firebaseGroqApiKey, userGroqKey, isUserGroqEnabled, reloadTrigger) {
         val keyToUse = if (isUserGroqEnabled && userGroqKey.isNotBlank()) userGroqKey else firebaseGroqApiKey
         if (keyToUse.isNotBlank()) {
             val cacheKey = keyToUse
             if (ChatData.cachedGroqModels.isNotEmpty() && ChatData.cachedGroqModelsKey == cacheKey) {
                 groqModels = ChatData.cachedGroqModels
             } else {
-                try {
-                    groqModels = ChatData.getOrFetchGroqModels(cacheKey)
-                } catch (e: Exception) {
-                    groqModels = emptyList()
+                val diskGroq = com.daemon.markvii.data.ModelsCacheManager.getGroqModels(cacheKey)
+                if (diskGroq != null && diskGroq.isNotEmpty()) {
+                    ChatData.cachedGroqModels = diskGroq
+                    ChatData.cachedGroqModelsKey = cacheKey
+                    groqModels = diskGroq
+                } else {
+                    try {
+                        groqModels = ChatData.getOrFetchGroqModels(cacheKey)
+                    } catch (e: Exception) {
+                        groqModels = emptyList()
+                    }
                 }
             }
         }

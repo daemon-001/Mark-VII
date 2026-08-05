@@ -185,6 +185,7 @@ class MainActivity : AppCompatActivity() {
         
         // Pre-fetch models in background to avoid lag in ChatScreen
         lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            com.daemon.markvii.data.FirebaseConfigManager.initialize()
             com.daemon.markvii.data.ChatData.prefetchModelsInBackground()
         }
         
