@@ -295,6 +295,7 @@ class MainActivity : AppCompatActivity() {
             val statusBarColor = android.graphics.Color.TRANSPARENT
             val navigationBarColor = android.graphics.Color.TRANSPARENT
             
+            @Suppress("DEPRECATION")
             SideEffect {
                 window.statusBarColor = statusBarColor
                 window.navigationBarColor = navigationBarColor
@@ -941,14 +942,14 @@ class MainActivity : AppCompatActivity() {
                         "zh-Hant" -> java.util.Locale.TRADITIONAL_CHINESE
                         "ja" -> java.util.Locale.JAPANESE
                         "ko" -> java.util.Locale.KOREAN
-                        "es" -> java.util.Locale("es")
+                        "es" -> java.util.Locale.forLanguageTag("es")
                         "fr" -> java.util.Locale.FRENCH
                         "de" -> java.util.Locale.GERMAN
                         "it" -> java.util.Locale.ITALIAN
-                        "pt" -> java.util.Locale("pt")
-                        "ru" -> java.util.Locale("ru")
-                        "ar" -> java.util.Locale("ar")
-                        "hi" -> java.util.Locale("hi")
+                        "pt" -> java.util.Locale.forLanguageTag("pt")
+                        "ru" -> java.util.Locale.forLanguageTag("ru")
+                        "ar" -> java.util.Locale.forLanguageTag("ar")
+                        "hi" -> java.util.Locale.forLanguageTag("hi")
                         "en" -> java.util.Locale.US
                         else -> java.util.Locale.US
                     }

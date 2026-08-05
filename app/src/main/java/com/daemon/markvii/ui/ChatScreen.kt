@@ -835,7 +835,7 @@ fun ChatScreen(
                                 AnimatedContent(
                                     targetState = chatState.isGeneratingResponse,
                                     transitionSpec = {
-                                        fadeIn(animationSpec = tween(200)) with
+                                        fadeIn(animationSpec = tween(200)) togetherWith
                                         fadeOut(animationSpec = tween(200))
                                     },
                                     label = "icon_animation"

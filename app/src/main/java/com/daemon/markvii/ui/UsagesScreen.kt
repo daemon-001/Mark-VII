@@ -8,9 +8,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -65,7 +65,7 @@ fun UsagesScreen(onBackClick: () -> Unit) {
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(
-                            imageVector = Icons.Rounded.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                             contentDescription = "Back",
                             tint = MaterialTheme.colorScheme.onSurface
                         )
@@ -139,7 +139,7 @@ fun UsagesScreen(onBackClick: () -> Unit) {
                             Text("View on OpenRouter", color = MaterialTheme.colorScheme.onSurface)
                             Spacer(Modifier.width(8.dp))
                             Icon(
-                                imageVector = Icons.Rounded.OpenInNew,
+                                imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp),
                                 tint = MaterialTheme.colorScheme.onSurface
@@ -195,7 +195,7 @@ fun UsagesScreen(onBackClick: () -> Unit) {
                             Text("View on Google AI Studio", color = MaterialTheme.colorScheme.onSurface)
                             Spacer(Modifier.width(8.dp))
                             Icon(
-                                imageVector = Icons.Rounded.OpenInNew,
+                                imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp),
                                 tint = MaterialTheme.colorScheme.onSurface
@@ -251,7 +251,7 @@ fun UsagesScreen(onBackClick: () -> Unit) {
                             Text("View on Groq Console", color = MaterialTheme.colorScheme.onSurface)
                             Spacer(Modifier.width(8.dp))
                             Icon(
-                                imageVector = Icons.Rounded.OpenInNew,
+                                imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp),
                                 tint = MaterialTheme.colorScheme.onSurface

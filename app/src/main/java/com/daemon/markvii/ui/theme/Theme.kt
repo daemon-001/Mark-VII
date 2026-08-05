@@ -115,6 +115,7 @@ fun MarkVIITheme(
     
     val view = LocalView.current
     if (!view.isInEditMode) {
+        @Suppress("DEPRECATION")
         SideEffect {
             val window = (view.context as Activity).window
             // Set status bar to transparent to allow edge-to-edge unified look

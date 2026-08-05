@@ -75,7 +75,7 @@ fun UserApiConfigItem(
             ),
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.None,
-                autoCorrect = false,
+                autoCorrectEnabled = false,
                 keyboardType = KeyboardType.Text
             ),
             isError = isError,
