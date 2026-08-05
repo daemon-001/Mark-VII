@@ -180,6 +180,14 @@ class MainActivity : AppCompatActivity() {
         // Initialize OnboardingPreferences
         com.daemon.markvii.data.OnboardingPreferences.init(applicationContext)
         
+        // Initialize ModelsCacheManager
+        com.daemon.markvii.data.ModelsCacheManager.init(applicationContext)
+        
+        // Pre-fetch models in background to avoid lag in ChatScreen
+        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            com.daemon.markvii.data.ChatData.prefetchModelsInBackground()
+        }
+        
         // Initialize TextToSpeech
         textToSpeech = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
@@ -336,6 +344,7 @@ class MainActivity : AppCompatActivity() {
                             
                             val hasSeenApiKeyWarning by com.daemon.markvii.data.UserApiPreferences.hasSeenApiKeyWarning.collectAsState()
                             var showApiKeyWarningDialog by remember { mutableStateOf(false) }
+                            var apiKeyWarningStep by remember { mutableIntStateOf(1) }
 
                             LaunchedEffect(hasSeenApiKeyWarning) {
                                 if (!hasSeenApiKeyWarning) {
@@ -594,32 +603,54 @@ class MainActivity : AppCompatActivity() {
                             if (showApiKeyWarningDialog) {
                                 AlertDialog(
                                     onDismissRequest = { 
-                                        showApiKeyWarningDialog = false 
-                                        com.daemon.markvii.data.UserApiPreferences.setHasSeenApiKeyWarning(true)
+                                        // Empty, force user to click buttons
                                     },
-                                    title = { Text("API Quota Notice", fontWeight = FontWeight.Bold) },
+                                    properties = androidx.compose.ui.window.DialogProperties(
+                                        dismissOnClickOutside = false,
+                                        dismissOnBackPress = false
+                                    ),
+                                    title = { 
+                                        Text(
+                                            if (apiKeyWarningStep == 1) "Model Pricing Notice" else "API Quota Notice", 
+                                            fontWeight = FontWeight.Bold
+                                        ) 
+                                    },
                                     text = { 
-                                        Text("Mark-VII uses shared developer API keys by default. You might encounter \"quota exceeded\" errors if usage is high.\n\nFor a faster and uninterrupted experience, it is highly recommended to configure your own personal API keys in the Settings.") 
+                                        if (apiKeyWarningStep == 1) {
+                                            Text("Some of the models are marked as 'Paid', but you can still use them for free within the free-tier limits of the default developer API keys.")
+                                        } else {
+                                            Text("Mark-VII uses shared developer API keys by default. You might encounter \"quota exceeded\" errors if usage is high.\n\nFor a faster and uninterrupted experience, it is highly recommended to configure your own personal API keys in the Settings.") 
+                                        }
                                     },
                                     confirmButton = {
-                                        TextButton(
-                                            onClick = {
-                                                showApiKeyWarningDialog = false
-                                                com.daemon.markvii.data.UserApiPreferences.setHasSeenApiKeyWarning(true)
-                                                showSettings = true
+                                        if (apiKeyWarningStep == 1) {
+                                            TextButton(
+                                                onClick = { apiKeyWarningStep = 2 }
+                                            ) {
+                                                Text("Next")
                                             }
-                                        ) {
-                                            Text("Settings")
+                                        } else {
+                                            TextButton(
+                                                onClick = {
+                                                    showApiKeyWarningDialog = false
+                                                    com.daemon.markvii.data.UserApiPreferences.setHasSeenApiKeyWarning(true)
+                                                    showSettings = true
+                                                }
+                                            ) {
+                                                Text("Settings")
+                                            }
                                         }
                                     },
                                     dismissButton = {
-                                        TextButton(
-                                            onClick = {
-                                                showApiKeyWarningDialog = false
-                                                com.daemon.markvii.data.UserApiPreferences.setHasSeenApiKeyWarning(true)
+                                        if (apiKeyWarningStep == 2) {
+                                            TextButton(
+                                                onClick = {
+                                                    showApiKeyWarningDialog = false
+                                                    com.daemon.markvii.data.UserApiPreferences.setHasSeenApiKeyWarning(true)
+                                                }
+                                            ) {
+                                                Text("OK")
                                             }
-                                        ) {
-                                            Text("OK")
                                         }
                                     },
                                     containerColor = appColors.surfaceVariant,

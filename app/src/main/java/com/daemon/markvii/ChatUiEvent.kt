@@ -16,7 +16,9 @@ sealed class ChatUiEvent {
         val prompt: String,
         val bitmap: Bitmap?,
         val modelResponseIndex: Int,
-        val retryOfPrompt: String          // the user prompt text to display as tag
+        val retryOfPrompt: String,          // the user prompt text to display as tag
+        val targetModel: String? = null,
+        val targetProvider: ApiProvider? = null
     ) : ChatUiEvent()
     object StopStreaming : ChatUiEvent()
     data class SwitchApiProvider(val provider: ApiProvider) : ChatUiEvent()

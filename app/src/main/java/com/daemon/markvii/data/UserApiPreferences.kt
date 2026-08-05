@@ -19,6 +19,7 @@ object UserApiPreferences {
     private const val KEY_GROQ_ENABLED = "groq_enabled"
     
     private const val KEY_HAS_SEEN_API_KEY_WARNING = "has_seen_api_key_warning"
+    private const val KEY_BOOKMARKED_MODELS = "bookmarked_models" 
     
     private lateinit var prefs: SharedPreferences
     
@@ -43,6 +44,10 @@ object UserApiPreferences {
     private val _isGroqKeyEnabled = MutableStateFlow(false)
     val isGroqKeyEnabled: StateFlow<Boolean> = _isGroqKeyEnabled.asStateFlow()
     
+    // Bookmarks
+    private val _bookmarkedModels = MutableStateFlow<Set<String>>(emptySet())
+    val bookmarkedModels: StateFlow<Set<String>> = _bookmarkedModels.asStateFlow()
+
     // UI Warnings
     private val _hasSeenApiKeyWarning = MutableStateFlow(false)
     val hasSeenApiKeyWarning: StateFlow<Boolean> = _hasSeenApiKeyWarning.asStateFlow()
@@ -61,6 +66,7 @@ object UserApiPreferences {
         _isGroqKeyEnabled.value = prefs.getBoolean(KEY_GROQ_ENABLED, false)
         
         _hasSeenApiKeyWarning.value = prefs.getBoolean(KEY_HAS_SEEN_API_KEY_WARNING, false)
+        _bookmarkedModels.value = prefs.getStringSet(KEY_BOOKMARKED_MODELS, emptySet()) ?: emptySet()
     }
     
     fun setGeminiApiKey(key: String) {
@@ -91,6 +97,17 @@ object UserApiPreferences {
     fun setGroqKeyEnabled(enabled: Boolean) {
         _isGroqKeyEnabled.value = enabled
         prefs.edit().putBoolean(KEY_GROQ_ENABLED, enabled).apply()
+    }
+
+    fun toggleModelBookmark(apiModel: String) {
+        val currentSet = _bookmarkedModels.value.toMutableSet()
+        if (currentSet.contains(apiModel)) {
+            currentSet.remove(apiModel)
+        } else {
+            currentSet.add(apiModel)
+        }
+        _bookmarkedModels.value = currentSet
+        prefs.edit().putStringSet(KEY_BOOKMARKED_MODELS, currentSet).apply()
     }
 
     fun setHasSeenApiKeyWarning(hasSeen: Boolean) {

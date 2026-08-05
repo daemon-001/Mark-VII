@@ -65,7 +65,7 @@ def load_models_from_csv(csv_file):
             reader = csv.DictReader(file)
             
             # Check required columns
-            required_columns = ['displayName', 'apiModel', 'isAvailable', 'order']
+            required_columns = ['displayName', 'apiModel', 'isAvailable', 'order', 'isPro']
             if not all(col in reader.fieldnames for col in required_columns):
                 print(f"❌ Error: CSV must have columns: {', '.join(required_columns)}")
                 print(f"   Found columns: {', '.join(reader.fieldnames)}")
@@ -80,11 +80,16 @@ def load_models_from_csv(csv_file):
                     # Parse order
                     order = int(row['order'].strip())
                     
+                    # Parse isPro
+                    is_pro_str = row.get('isPro', 'FALSE').strip().lower()
+                    is_pro = is_pro_str in ['true', 'yes', '1', 'y']
+                    
                     model = {
                         "displayName": row['displayName'].strip(),
                         "apiModel": row['apiModel'].strip(),
                         "isAvailable": is_available,
-                        "order": order
+                        "order": order,
+                        "isPro": is_pro
                     }
                     
                     models.append(model)

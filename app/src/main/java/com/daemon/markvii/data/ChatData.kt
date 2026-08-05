@@ -16,7 +16,10 @@ import java.io.ByteArrayOutputStream
 data class ModelInfo(
     val displayName: String,
     val apiModel: String,
-    val isAvailable: Boolean = true
+    val isAvailable: Boolean = true,
+    val isPro: Boolean = false,
+    val isPaid: Boolean = false,
+    val created: Long = 0
 )
 
 object ChatData {
@@ -71,8 +74,7 @@ object ChatData {
     }
     
     /**
-     * Fetch only FREE models from OpenRouter
-     * A model is considered free if prompt and completion prices are "0"
+     * Fetch ALL models from OpenRouter (Free and Paid)
      */
     suspend fun fetchFreeModels(): List<ModelInfo> {
         return try {
@@ -84,14 +86,14 @@ object ChatData {
             // Use a map to deduplicate models by base ID (without :free suffix)
             val uniqueModels = mutableMapOf<String, ModelInfo>()
             
-            allModels.filter { model ->
+            allModels.forEach { model ->
                 val pricing = model.pricing
-                val promptPrice = pricing?.prompt?.toDoubleOrNull() ?: 1.0
-                val completionPrice = pricing?.completion?.toDoubleOrNull() ?: 1.0
+                val promptPrice = pricing?.prompt?.toDoubleOrNull() ?: 0.0
+                val completionPrice = pricing?.completion?.toDoubleOrNull() ?: 0.0
                 
-                // Free models have 0 cost for both prompt and completion
-                promptPrice == 0.0 && completionPrice == 0.0
-            }.forEach { model ->
+                // Paid models have cost > 0
+                val isPaid = promptPrice > 0.0 || completionPrice > 0.0
+                
                 // Clean up display name
                 val cleanDisplayName = (model.name ?: model.id)
                     .replace("(free)", "", ignoreCase = true)
@@ -125,28 +127,47 @@ object ChatData {
                     uniqueModels[modelIdWithoutFree] = ModelInfo(
                         displayName = cleanDisplayName,
                         apiModel = cleanApiModel,
-                        isAvailable = true
+                        isAvailable = true,
+                        isPaid = isPaid,
+                        created = model.created ?: 0
                     )
                 }
             }
             
-            uniqueModels.values.toList()
+            uniqueModels.values.toList().sortedWith(
+                compareBy<ModelInfo> { it.isPaid }.thenByDescending { it.created }
+            )
         } catch (e: Exception) {
             emptyList()
         }
     }
 
     /**
-     * Get cached free models, or fetch them if not already loaded
+     * Get cached free models (memory or disk), or fetch them if not already loaded
      */
     suspend fun getOrFetchFreeModels(cacheKey: String? = null): List<ModelInfo> {
-        if (cachedFreeModels.isNotEmpty() && cacheKey != null && cacheKey == cachedFreeModelsKey) {
+        // 1. If we have memory cached models and key matches, return them immediately
+        if (cachedFreeModels.isNotEmpty() && cacheKey != null && cachedFreeModelsKey == cacheKey) {
             return cachedFreeModels
         }
 
+        // 2. Check disk cache
+        if (cacheKey != null) {
+            val diskModels = ModelsCacheManager.getOpenRouterModels(cacheKey)
+            if (diskModels != null && diskModels.isNotEmpty()) {
+                cachedFreeModels = diskModels
+                cachedFreeModelsKey = cacheKey
+                return diskModels
+            }
+        }
+
+        // 3. Otherwise fetch from network, update caches, and return
         val models = fetchFreeModels()
-        cachedFreeModels = models
-        cachedFreeModelsKey = cacheKey ?: ""
+        if (models.isNotEmpty() && cacheKey != null) {
+            cachedFreeModels = models
+            cachedFreeModelsKey = cacheKey
+            ModelsCacheManager.saveOpenRouterModels(models, cacheKey)
+        }
         return models
     }
 
@@ -171,26 +192,127 @@ object ChatData {
                     ModelInfo(
                         displayName = cleanName,
                         apiModel = model.id,
-                        isAvailable = true
+                        isAvailable = true,
+                        created = model.created ?: 0
                     )
                 }
-                .sortedBy { it.displayName }
+                .sortedByDescending { it.created }
         } catch (e: Exception) {
             emptyList()
         }
     }
 
     /**
-     * Get cached Groq models, or fetch them if not already loaded
+     * Get cached Groq models (memory or disk), or fetch them if not already loaded
      */
     suspend fun getOrFetchGroqModels(cacheKey: String? = null): List<ModelInfo> {
-        if (cachedGroqModels.isNotEmpty() && cacheKey != null && cacheKey == cachedGroqModelsKey) {
+        // 1. If we have memory cached models and key matches, return them immediately
+        if (cachedGroqModels.isNotEmpty() && cacheKey != null && cachedGroqModelsKey == cacheKey) {
             return cachedGroqModels
         }
+        
+        // 2. Check disk cache
+        if (cacheKey != null) {
+            val diskModels = ModelsCacheManager.getGroqModels(cacheKey)
+            if (diskModels != null && diskModels.isNotEmpty()) {
+                cachedGroqModels = diskModels
+                cachedGroqModelsKey = cacheKey
+                return diskModels
+            }
+        }
+
+        // 3. Otherwise fetch from network, update caches, and return
         val models = fetchGroqModels()
-        cachedGroqModels = models
-        cachedGroqModelsKey = cacheKey ?: ""
+        if (models.isNotEmpty() && cacheKey != null) {
+            cachedGroqModels = models
+            cachedGroqModelsKey = cacheKey
+            ModelsCacheManager.saveGroqModels(models, cacheKey)
+        }
         return models
+    }
+    
+    /**
+     * Fetch models in the background (used at app startup) to pre-warm the cache.
+     * This avoids lag when ChatScreen is opened.
+     */
+    suspend fun prefetchModelsInBackground() {
+        try {
+            // OpenRouter prefetch
+            val openRouterKey = FirebaseConfigManager.apiKey.value
+            if (openRouterKey.isNotEmpty()) {
+                val exceptionModels = FirebaseConfigManager.exceptionModels.value
+                val cacheKey = "$openRouterKey|${exceptionModels.hashCode()}"
+                
+                val openRouterModels = fetchFreeModels()
+                if (openRouterModels.isNotEmpty()) {
+                    cachedFreeModels = openRouterModels
+                    cachedFreeModelsKey = cacheKey
+                    ModelsCacheManager.saveOpenRouterModels(openRouterModels, cacheKey)
+                }
+            }
+            
+            // Groq prefetch
+            val firebaseGroqApiKey = FirebaseConfigManager.groqApiKey.value
+            val userGroqKey = com.daemon.markvii.data.UserApiPreferences.groqApiKey.value
+            val isUserGroqEnabled = com.daemon.markvii.data.UserApiPreferences.isGroqKeyEnabled.value
+            val keyToUse = if (isUserGroqEnabled && userGroqKey.isNotBlank()) userGroqKey else firebaseGroqApiKey
+            
+            if (keyToUse.isNotBlank()) {
+                val groqModelsList = fetchGroqModels()
+                if (groqModelsList.isNotEmpty()) {
+                    cachedGroqModels = groqModelsList
+                    cachedGroqModelsKey = keyToUse
+                    ModelsCacheManager.saveGroqModels(groqModelsList, keyToUse)
+                }
+            }
+        } catch (e: Exception) {
+            // Silently fail prefetch if network issues occur
+        }
+    }
+    
+    /**
+     * Get a unified list of all models across all providers
+     */
+    suspend fun getAllGlobalModels(
+        openRouterCacheKey: String?,
+        groqCacheKey: String?
+    ): List<GlobalModelInfo> {
+        val geminiModels = FirebaseConfigManager.geminiModels.value.map {
+            GlobalModelInfo(
+                apiModel = it.apiModel,
+                displayName = it.displayName,
+                provider = com.daemon.markvii.ApiProvider.GEMINI,
+                isPro = it.isPro,
+                isPaid = false,
+                isAvailable = true
+            )
+        }
+        
+        val openRouterModels = getOrFetchFreeModels(openRouterCacheKey).map {
+            GlobalModelInfo(
+                apiModel = it.apiModel,
+                displayName = it.displayName,
+                provider = com.daemon.markvii.ApiProvider.OPENROUTER,
+                isPro = it.isPro,
+                isPaid = it.isPaid,
+                isAvailable = it.isAvailable,
+                created = it.created
+            )
+        }
+        
+        val groqModels = getOrFetchGroqModels(groqCacheKey).map {
+            GlobalModelInfo(
+                apiModel = it.apiModel,
+                displayName = it.displayName,
+                provider = com.daemon.markvii.ApiProvider.GROQ,
+                isPro = it.isPro,
+                isPaid = it.isPaid,
+                isAvailable = it.isAvailable,
+                created = it.created
+            )
+        }
+        
+        return geminiModels + openRouterModels + groqModels
     }
 
     /**

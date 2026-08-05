@@ -82,7 +82,9 @@ fun ChatScreen(
     val context = LocalContext.current
     // State for loading free models from OpenRouter and Gemini
     var isLoadingModels by remember { mutableStateOf(ChatData.cachedFreeModels.isEmpty()) }
+    var reloadTrigger by remember { mutableIntStateOf(0) }
     var freeModels by remember { mutableStateOf<List<ModelInfo>>(ChatData.cachedFreeModels) }
+
     var modelsLoadError by remember { mutableStateOf<String?>(null) }
     var groqModels by remember { mutableStateOf<List<ModelInfo>>(ChatData.cachedGroqModels) }
     val appColors = LocalAppColors.current // Get theme colors for outer scope
@@ -99,7 +101,8 @@ fun ChatScreen(
             ModelInfo(
                 displayName = firebaseModel.displayName,
                 apiModel = firebaseModel.apiModel,
-                isAvailable = firebaseModel.isAvailable
+                isAvailable = firebaseModel.isAvailable,
+                isPro = firebaseModel.isPro
             )
         }
     }
@@ -124,6 +127,18 @@ fun ChatScreen(
 
     val userGroqKey by com.daemon.markvii.data.UserApiPreferences.groqApiKey.collectAsState()
     val isUserGroqEnabled by com.daemon.markvii.data.UserApiPreferences.isGroqKeyEnabled.collectAsState()
+
+    var globalModels by remember { mutableStateOf<List<com.daemon.markvii.data.GlobalModelInfo>>(emptyList()) }
+    var isGlobalModelSelectorExpanded by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(firebaseApiKey, firebaseGroqApiKey, exceptionModels, userGroqKey, isUserGroqEnabled, ChatData.cachedFreeModels, ChatData.cachedGroqModels) {
+        val modelsCacheKey = if (firebaseApiKey.isNotEmpty()) "$firebaseApiKey|${exceptionModels.hashCode()}_v2" else null
+        val groqCacheKey = if (isUserGroqEnabled && userGroqKey.isNotBlank()) userGroqKey else firebaseGroqApiKey
+        val finalGroqCacheKey = if (groqCacheKey.isNotEmpty()) groqCacheKey else null
+        
+        globalModels = ChatData.getAllGlobalModels(modelsCacheKey, finalGroqCacheKey)
+    }
+
 
     // Update API keys - Prioritize User Keys
     LaunchedEffect(firebaseApiKey, userOpenRouterKey, isUserOpenRouterEnabled) {
@@ -166,7 +181,7 @@ fun ChatScreen(
     // Observe exception models to trigger reload when they change
     val exceptionModels by FirebaseConfigManager.exceptionModels.collectAsState()
     
-    LaunchedEffect(firebaseApiKey, exceptionModels) {
+    LaunchedEffect(firebaseApiKey, exceptionModels, reloadTrigger) {
         if (firebaseApiKey.isNotEmpty()) {
             // Build a cache key that changes when either API key or exception models change
             val modelsCacheKey = "$firebaseApiKey|${exceptionModels.hashCode()}"
@@ -251,7 +266,6 @@ fun ChatScreen(
 
     // Model selector state for prompt box
     val isPromptDropDownExpanded = remember { mutableStateOf(false) }
-    val promptItemPosition = remember { mutableStateOf(0) }
     
     // LazyList state for auto-scrolling
     val listState = rememberLazyListState()
@@ -265,22 +279,15 @@ fun ChatScreen(
         ApiProvider.OPENROUTER -> freeModels
         ApiProvider.GEMINI -> geminiModels
         ApiProvider.GROQ -> groqModels
-    }
+    }.sortedBy { it.isPro }
     
-    // Reset model selection when API provider changes
-    LaunchedEffect(currentApiProvider) {
-        promptItemPosition.value = 0
+    // Ensure selected model is valid for current provider
+    LaunchedEffect(currentApiProvider, currentModels) {
         if (currentModels.isNotEmpty()) {
-            ChatData.selected_model = currentModels[0].apiModel
-        }
-    }
-    
-    // Set initial model when models load (only once)
-    var hasSetInitialModel by remember { mutableStateOf(false) }
-    LaunchedEffect(currentModels) {
-        if (!hasSetInitialModel && currentModels.isNotEmpty() && promptItemPosition.value < currentModels.size) {
-            ChatData.selected_model = currentModels[promptItemPosition.value].apiModel
-            hasSetInitialModel = true
+            val isCurrentModelValid = currentModels.any { it.apiModel == ChatData.selected_model }
+            if (!isCurrentModelValid) {
+                ChatData.selected_model = currentModels[0].apiModel
+            }
         }
     }
 
@@ -377,9 +384,9 @@ fun ChatScreen(
                             modelUsed = chat.modelUsed,
                             isStreaming = chat.isStreaming,
                             isError = chat.isError,
-                            freeModels = stableFreeModels,
-                            geminiModels = stableGeminiModels,
-                            groqModels = stableGroqModels,
+                            
+                            
+                            globalModels = globalModels,
                             currentApiProvider = currentApiProvider,
                             hasImage = previousUserChat?.bitmap != null,
                             retryOfPrompt = chat.retryOfPrompt,
@@ -399,13 +406,18 @@ fun ChatScreen(
                                     }
                                 }
                             },
-                            onRetry = { _ ->
+                            onRetry = { selectedModel ->
+                                chaViewModel.onEvent(
+                                    ChatUiEvent.SwitchApiProvider(selectedModel.provider)
+                                )
                                 chaViewModel.onEvent(
                                     ChatUiEvent.RetryPrompt(
-                                        previousUserChat?.prompt ?: "",
-                                        previousUserChat?.bitmap,
-                                        index,
-                                        retryOfPrompt = previousUserChat?.prompt ?: ""
+                                        prompt = previousUserChat?.prompt ?: "",
+                                        bitmap = previousUserChat?.bitmap,
+                                        modelResponseIndex = index,
+                                        retryOfPrompt = previousUserChat?.prompt ?: "",
+                                        targetModel = selectedModel.apiModel,
+                                        targetProvider = selectedModel.provider
                                     )
                                 )
                             },
@@ -627,18 +639,14 @@ fun ChatScreen(
                                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                                             )
                                         ) { 
-                                            isPromptDropDownExpanded.value = true 
+                                            isGlobalModelSelectorExpanded = true 
                                         }
                                         .padding(vertical = 8.dp, horizontal = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Text(
-                                        text = if (currentModels.isNotEmpty() && promptItemPosition.value < currentModels.size) {
-                                            currentModels[promptItemPosition.value].displayName
-                                        } else {
-                                            "Model Selector"
-                                        },
+                                        text = globalModels.find { it.apiModel == ChatData.selected_model }?.displayName ?: "Model Selector",
                                         fontSize = 13.sp,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         style = MaterialTheme.typography.bodyMedium,
@@ -655,273 +663,7 @@ fun ChatScreen(
                                     )
                                 }
                                 
-                                // Dropdown menu with Material3 built-in animations (no always-running animateFloatAsState)
-                                DropdownMenu(
-                                    expanded = isPromptDropDownExpanded.value,
-                                    onDismissRequest = { isPromptDropDownExpanded.value = false },
-                                    modifier = Modifier
-                                        .width(320.dp)
-                                        .heightIn(max = 450.dp)
-                                        .background(MaterialTheme.colorScheme.surface),
-                                    shape = RoundedCornerShape(20.dp),
-                                    containerColor = MaterialTheme.colorScheme.surface
-                                ) {
-                                        // API Provider Switch at the top
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 16.dp, vertical = 12.dp)
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                // Gemini button
-                                                Box(
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .clip(RoundedCornerShape(10.dp))
-                                                        .background(
-                                                            if (currentApiProvider == ApiProvider.GEMINI)
-                                                                appColors.accent.copy(alpha = 0.2f)
-                                                            else
-                                                                appColors.surfaceTertiary
-                                                        )
-                                                        .clickable {
-                                                            chaViewModel.onEvent(
-                                                                ChatUiEvent.SwitchApiProvider(ApiProvider.GEMINI)
-                                                            )
-                                                        }
-                                                        .padding(vertical = 8.dp),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text(
-                                                        text = "Gemini",
-                                                        color = if (currentApiProvider == ApiProvider.GEMINI)
-                                                            appColors.accent
-                                                        else
-                                                            appColors.textSecondary,
-                                                        fontSize = 11.sp,
-                                                        fontWeight = if (currentApiProvider == ApiProvider.GEMINI)
-                                                            FontWeight.SemiBold
-                                                        else
-                                                            FontWeight.Normal
-                                                    )
-                                                }
-                                                
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                
-                                                // OpenRouter button
-                                                Box(
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .clip(RoundedCornerShape(10.dp))
-                                                        .background(
-                                                            if (currentApiProvider == ApiProvider.OPENROUTER)
-                                                                appColors.accent.copy(alpha = 0.2f)
-                                                            else
-                                                                appColors.surfaceTertiary
-                                                        )
-                                                        .clickable {
-                                                            chaViewModel.onEvent(
-                                                                ChatUiEvent.SwitchApiProvider(ApiProvider.OPENROUTER)
-                                                            )
-                                                        }
-                                                        .padding(vertical = 8.dp),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text(
-                                                        text = "OpenRouter",
-                                                        color = if (currentApiProvider == ApiProvider.OPENROUTER)
-                                                            appColors.accent
-                                                        else
-                                                            appColors.textSecondary,
-                                                        fontSize = 11.sp,
-                                                        fontWeight = if (currentApiProvider == ApiProvider.OPENROUTER)
-                                                            FontWeight.SemiBold
-                                                        else
-                                                            FontWeight.Normal
-                                                    )
-                                                }
 
-                                                Spacer(modifier = Modifier.width(8.dp))
-
-                                                // Groq button
-                                                Box(
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .clip(RoundedCornerShape(10.dp))
-                                                        .background(
-                                                            if (currentApiProvider == ApiProvider.GROQ)
-                                                                appColors.accent.copy(alpha = 0.2f)
-                                                            else
-                                                                appColors.surfaceTertiary
-                                                        )
-                                                        .clickable {
-                                                            chaViewModel.onEvent(
-                                                                ChatUiEvent.SwitchApiProvider(ApiProvider.GROQ)
-                                                            )
-                                                        }
-                                                        .padding(vertical = 8.dp),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text(
-                                                        text = "Groq",
-                                                        color = if (currentApiProvider == ApiProvider.GROQ)
-                                                            appColors.accent
-                                                        else
-                                                            appColors.textSecondary,
-                                                        fontSize = 11.sp,
-                                                        fontWeight = if (currentApiProvider == ApiProvider.GROQ)
-                                                            FontWeight.SemiBold
-                                                        else
-                                                            FontWeight.Normal
-                                                    )
-                                                }
-                                            }
-                                            
-                                            // Divider
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(vertical = 8.dp)
-                                                    .height(1.dp)
-                                                    .background(appColors.divider)
-                                            )
-                                        }
-                                        
-                                    if (currentModels.isEmpty()) {
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 16.dp, horizontal = 16.dp),
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                                        ) {
-                                            Text(
-                                                text = "No models available",
-                                                color = appColors.textSecondary,
-                                                fontSize = 14.sp,
-                                                style = MaterialTheme.typography.bodyMedium
-                                            )
-                                            
-                                            // Show reload button only for OpenRouter
-                                            if (currentApiProvider == ApiProvider.OPENROUTER) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .clip(RoundedCornerShape(10.dp))
-                                                        .background(appColors.accent.copy(alpha = 0.15f))
-                                                        .clickable {
-                                                            // Clear cache and reload models
-                                                            ChatData.cachedFreeModels = emptyList()
-                                                            ChatData.cachedFreeModelsKey = ""
-                                                            isLoadingModels = true
-                                                            coroutineScope.launch {
-                                                                try {
-                                                                    val modelsCacheKey = "$firebaseApiKey|${exceptionModels.hashCode()}"
-                                                                    freeModels = ChatData.getOrFetchFreeModels(modelsCacheKey)
-                                                                    if (freeModels.isEmpty()) {
-                                                                        modelsLoadError = "No free models available"
-                                                                    } else {
-                                                                        modelsLoadError = null
-                                                                    }
-                                                                } catch (e: Exception) {
-                                                                    modelsLoadError = "Failed to load models: ${e.message}"
-                                                                } finally {
-                                                                    isLoadingModels = false
-                                                                }
-                                                            }
-                                                        }
-                                                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                                                ) {
-                                                    Row(
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        Icon(
-                                                            imageVector = Icons.Rounded.Refresh,
-                                                            contentDescription = "Reload models",
-                                                            tint = appColors.accent,
-                                                            modifier = Modifier.size(18.dp)
-                                                        )
-                                                        Text(
-                                                            text = "Reload Models",
-                                                            color = appColors.accent,
-                                                            fontSize = 13.sp,
-                                                            fontWeight = FontWeight.SemiBold
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                        currentModels.forEachIndexed { index, model ->
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(horizontal = 8.dp, vertical = 2.dp)
-                                            ) {
-                                                DropdownMenuItem(
-                                                    text = {
-                                                        Row(
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            verticalAlignment = Alignment.CenterVertically
-                                                        ) {
-                                                            Text(
-                                                                text = model.displayName,
-                                                                color = if (promptItemPosition.value == index) 
-                                                                    appColors.accent 
-                                                                else 
-                                                                    MaterialTheme.colorScheme.onSurface,
-                                                                fontSize = 15.sp,
-                                                                style = MaterialTheme.typography.bodyMedium,
-                                                                fontWeight = if (promptItemPosition.value == index) 
-                                                                    FontWeight.SemiBold 
-                                                                else 
-                                                                    FontWeight.Normal
-                                                            )
-                                                        }
-                                                    },
-                                                    onClick = {
-                                                        isPromptDropDownExpanded.value = false
-                                                        promptItemPosition.value = index
-                                                        ChatData.selected_model = model.apiModel
-                                                        
-                                                        if (!model.isAvailable) {
-                                                            Toast.makeText(
-                                                                context,
-                                                                "Model temporarily unavailable",
-                                                                Toast.LENGTH_SHORT
-                                                            ).show()
-                                                        }
-                                                    },
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .clip(RoundedCornerShape(12.dp))
-                                                        .background(
-                                                            if (promptItemPosition.value == index)
-                                                                appColors.accent.copy(alpha = 0.1f)
-                                                            else
-                                                                appColors.surfaceVariant
-                                                        ),
-                                                    contentPadding = PaddingValues(
-                                                        horizontal = 12.dp,
-                                                        vertical = 12.dp
-                                                    ),
-                                                    colors = MenuDefaults.itemColors(
-                                                        textColor = MaterialTheme.colorScheme.onSurface,
-                                                        leadingIconColor = MaterialTheme.colorScheme.onSurface,
-                                                        trailingIconColor = MaterialTheme.colorScheme.onSurface,
-                                                        disabledTextColor = appColors.textSecondary,
-                                                        disabledLeadingIconColor = appColors.textSecondary,
-                                                        disabledTrailingIconColor = appColors.textSecondary
-                                                    )
-                                                )
-                                            }
-                                        }
-                                    }
-                                    }
                             }
                             }
                             
@@ -1064,7 +806,7 @@ fun ChatScreen(
                                         if (chatState.isGeneratingResponse) {
                                             appColors.error // Red when streaming
                                         } else if (chatState.prompt.isNotEmpty() || bitmap != null) {
-                                            appColors.accent
+                                            MaterialTheme.colorScheme.primary
                                         } else {
                                             appColors.surfaceTertiary
                                         }
@@ -1106,9 +848,9 @@ fun ChatScreen(
                                     },
                                     contentDescription = if (isGenerating) "Stop" else "Send",
                                     tint = if (isGenerating) {
-                                        MaterialTheme.colorScheme.onPrimary
+                                        MaterialTheme.colorScheme.onError
                                     } else if (chatState.prompt.isNotEmpty() || bitmap != null) {
-                                        Color(0xFF1C1C1E)
+                                        MaterialTheme.colorScheme.onPrimary
                                     } else {
                                         appColors.textSecondary
                                     },
@@ -1120,6 +862,34 @@ fun ChatScreen(
                     }
                 }
             }
+
+    if (isGlobalModelSelectorExpanded) {
+        com.daemon.markvii.ui.components.GlobalModelSelectorBottomSheet(
+            globalModels = globalModels,
+            currentApiProvider = currentApiProvider,
+            onProviderSelected = { provider ->
+                chaViewModel.onEvent(ChatUiEvent.SwitchApiProvider(provider))
+            },
+            onModelSelected = { model ->
+                if (model.provider != currentApiProvider) {
+                    chaViewModel.onEvent(ChatUiEvent.SwitchApiProvider(model.provider))
+                }
+                ChatData.selected_model = model.apiModel
+            },
+            onDismissRequest = { isGlobalModelSelectorExpanded = false },
+            hasImage = bitmap != null,
+            selectedModelId = ChatData.selected_model,
+            onReloadModels = {
+                com.daemon.markvii.data.ModelsCacheManager.clearAllModels()
+                ChatData.cachedFreeModels = emptyList()
+                ChatData.cachedFreeModelsKey = ""
+                ChatData.cachedGroqModels = emptyList()
+                ChatData.cachedGroqModelsKey = ""
+                reloadTrigger++
+            },
+            isLoadingModels = isLoadingModels
+        )
+    }
         }
     } // ModalNavigationDrawer
 

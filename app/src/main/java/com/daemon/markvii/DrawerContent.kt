@@ -1,4 +1,5 @@
 package com.daemon.markvii
+import androidx.compose.material.icons.filled.MoreVert
 
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.Image
@@ -84,46 +85,46 @@ fun DrawerContent(
         // Header
 
         
+        // Stable callbacks
+        val currentOnSettingsClick by rememberUpdatedState(onSettingsClick)
+        val currentOnDismiss by rememberUpdatedState(onDismiss)
+        
+        val stableOnNewChat: () -> Unit = remember(chatViewModel) {
+            {
+                chatViewModel.onEvent(ChatUiEvent.CreateNewSession)
+                currentOnDismiss()
+            }
+        }
+        
+        val stableOnSessionClick: (String) -> Unit = remember(chatViewModel) {
+            { sessionId ->
+                chatViewModel.onEvent(ChatUiEvent.SwitchSession(sessionId))
+                currentOnDismiss()
+            }
+        }
+        
+        val stableOnSessionDelete: (String) -> Unit = remember(chatViewModel) {
+            { sessionId ->
+                chatViewModel.onEvent(ChatUiEvent.DeleteSession(sessionId))
+            }
+        }
+        
+        val stableOnRename: (String, String) -> Unit = remember(chatViewModel) {
+            { sessionId, newTitle ->
+                chatViewModel.onEvent(ChatUiEvent.RenameSession(sessionId, newTitle))
+            }
+        }
+        
+        val stableOnSignOut: () -> Unit = remember(chatViewModel) {
+            {
+                chatViewModel.onEvent(ChatUiEvent.SignOut)
+                currentOnDismiss()
+            }
+        }
+
         // Check if user is signed in
         val user = currentUser
         if (user != null) {
-            // Stable callbacks
-            val currentOnSettingsClick by rememberUpdatedState(onSettingsClick)
-            val currentOnDismiss by rememberUpdatedState(onDismiss)
-            
-            val stableOnNewChat: () -> Unit = remember(chatViewModel) {
-                {
-                    chatViewModel.onEvent(ChatUiEvent.CreateNewSession)
-                    currentOnDismiss()
-                }
-            }
-            
-            val stableOnSessionClick: (String) -> Unit = remember(chatViewModel) {
-                { sessionId ->
-                    chatViewModel.onEvent(ChatUiEvent.SwitchSession(sessionId))
-                    currentOnDismiss()
-                }
-            }
-            
-            val stableOnSessionDelete: (String) -> Unit = remember(chatViewModel) {
-                { sessionId ->
-                    chatViewModel.onEvent(ChatUiEvent.DeleteSession(sessionId))
-                }
-            }
-            
-            val stableOnRename: (String, String) -> Unit = remember(chatViewModel) {
-                { sessionId, newTitle ->
-                    chatViewModel.onEvent(ChatUiEvent.RenameSession(sessionId, newTitle))
-                }
-            }
-            
-            val stableOnSignOut: () -> Unit = remember(chatViewModel) {
-                {
-                    chatViewModel.onEvent(ChatUiEvent.SignOut)
-                    currentOnDismiss()
-                }
-            }
-
             // Authenticated state
             AuthenticatedDrawerContent(
                 userDisplayName = user.displayName ?: "User",
@@ -141,6 +142,11 @@ fun DrawerContent(
         } else {
             // Unauthenticated state
             UnauthenticatedDrawerContent(
+                sessions = chatSessions,
+                currentSessionId = currentSessionId,
+                onSessionClick = stableOnSessionClick,
+                onSessionDelete = stableOnSessionDelete,
+                onRename = stableOnRename,
                 onNavigateToAuth = {
                     onDismiss()
                     onNavigateToAuth()
@@ -157,6 +163,11 @@ fun DrawerContent(
 
 @Composable
 fun UnauthenticatedDrawerContent(
+    sessions: List<ChatSession>,
+    currentSessionId: String?,
+    onSessionClick: (String) -> Unit,
+    onSessionDelete: (String) -> Unit,
+    onRename: (String, String) -> Unit,
     onNavigateToAuth: () -> Unit,
     onNewChat: () -> Unit,
     onSettingsClick: () -> Unit = {}
@@ -278,20 +289,47 @@ fun UnauthenticatedDrawerContent(
         
         Spacer(modifier = Modifier.height(12.dp))
         
-        // Empty state for guest
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = "Sign in to save and view your chat history across devices.",
-                fontSize = 14.sp,
-                color = appColors.textSecondary,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
+        if (sessions.isEmpty()) {
+            // Empty state for guest
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "Sign in to save and view your chat history across devices.",
+                    fontSize = 14.sp,
+                    color = appColors.textSecondary,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+        } else {
+            val sortedSessions = remember(sessions) {
+                sessions.sortedByDescending { it.updatedAt }
+            }
+            
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+            ) {
+                items(
+                    items = sortedSessions,
+                    key = { it.id },
+                    contentType = { "chat_session" }
+                ) { session ->
+                    ChatSessionItem(
+                        sessionId = session.id,
+                        sessionTitle = session.title,
+                        sessionUpdatedAt = session.updatedAt.seconds * 1000L + session.updatedAt.nanoseconds / 1000000L,
+                        isSelected = session.id == currentSessionId,
+                        onClick = onSessionClick,
+                        onDelete = onSessionDelete,
+                        onRename = onRename
+                    )
+                }
+            }
         }
     }
 }
@@ -450,7 +488,7 @@ fun AuthenticatedDrawerContent(
                 ChatSessionItem(
                     sessionId = session.id,
                     sessionTitle = session.title,
-                    sessionUpdatedAt = session.updatedAt.toDate().time,
+                    sessionUpdatedAt = session.updatedAt.seconds * 1000L + session.updatedAt.nanoseconds / 1000000L,
                     isSelected = session.id == currentSessionId,
                     onClick = onSessionClick,
                     onDelete = onSessionDelete,
@@ -479,7 +517,7 @@ fun ChatSessionItem(
     
     // Format date string
     val formattedDate = remember(sessionUpdatedAt) {
-        dateFormatter.format(java.util.Date(sessionUpdatedAt))
+        android.text.format.DateUtils.getRelativeTimeSpanString(sessionUpdatedAt).toString()
     }
     
     Box(
@@ -487,12 +525,9 @@ fun ChatSessionItem(
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(if (isSelected) appColors.accent.copy(alpha = 0.1f) else Color.Transparent)
-            .combinedClickable(
-                onClick = { onClick(sessionId) },
-                onLongClick = { showMenu = true }
-            )
-            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .background(if (isSelected) appColors.accent.copy(alpha = 0.1f) else appColors.surfaceVariant.copy(alpha = 0.3f))
+            .clickable(onClick = { onClick(sessionId) })
+            .padding(start = 16.dp, end = 4.dp, top = 14.dp, bottom = 14.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -536,42 +571,56 @@ fun ChatSessionItem(
                     maxLines = 1
                 )
             }
-        }
-        
-        // Context Menu
-        DropdownMenu(
-            expanded = showMenu,
-            onDismissRequest = { showMenu = false },
-            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-        ) {
-            DropdownMenuItem(
-                text = { Text("Rename", color = MaterialTheme.colorScheme.onSurface) },
-                onClick = {
-                    showMenu = false
-                    showRenameDialog = true
-                },
-                leadingIcon = {
+            
+            Box {
+                IconButton(
+                    onClick = { showMenu = true },
+                    modifier = Modifier.size(36.dp)
+                ) {
                     Icon(
-                        androidx.compose.material.icons.Icons.Rounded.Edit,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface
+                        imageVector = androidx.compose.material.icons.Icons.Default.MoreVert,
+                        contentDescription = "More Options",
+                        tint = appColors.textSecondary,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
-            )
-            DropdownMenuItem(
-                text = { Text("Delete", color = appColors.error) },
-                onClick = {
-                    showMenu = false
-                    showDeleteDialog = true
-                },
-                leadingIcon = {
-                    Icon(
-                        Icons.Rounded.Delete,
-                        contentDescription = null,
-                        tint = appColors.error
+                
+                // Context Menu
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Rename", color = MaterialTheme.colorScheme.onSurface) },
+                        onClick = {
+                            showMenu = false
+                            showRenameDialog = true
+                        },
+                        leadingIcon = {
+                            Icon(
+                                androidx.compose.material.icons.Icons.Rounded.Edit,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Delete", color = appColors.error) },
+                        onClick = {
+                            showMenu = false
+                            showDeleteDialog = true
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Rounded.Delete,
+                                contentDescription = null,
+                                tint = appColors.error
+                            )
+                        }
                     )
                 }
-            )
+            }
         }
     }
     

@@ -67,7 +67,7 @@ fun ExploreStyleSuggestions(onSuggestionClick: (String) -> Unit) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             val categories = listOf(
-                "Gemini 1.5 Pro", "Gemini 1.5 Flash", "OpenRouter Models",
+                "Gemini 3.1 Pro", "Gemini 2.5 Flash", "OpenRouter Models",
                 "Text-to-Speech", "Image Analysis", "PDF Export",
                 "Smart History", "Markdown Support", "Voice Input"
             )

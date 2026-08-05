@@ -97,7 +97,8 @@ object FirebaseConfigManager {
                         displayName = modelMap["displayName"] as? String ?: "",
                         apiModel = modelMap["apiModel"] as? String ?: "",
                         isAvailable = modelMap["isAvailable"] as? Boolean ?: true,
-                        order = (modelMap["order"] as? Long)?.toInt() ?: 0
+                        order = (modelMap["order"] as? Long)?.toInt() ?: 0,
+                        isPro = modelMap["isPro"] as? Boolean ?: false
                     )
                     modelsList.add(model)
                 }
@@ -135,7 +136,8 @@ object FirebaseConfigManager {
                         displayName = modelMap["displayName"] as? String ?: "",
                         apiModel = modelMap["apiModel"] as? String ?: "",
                         isAvailable = modelMap["isAvailable"] as? Boolean ?: true,
-                        order = (modelMap["order"] as? Long)?.toInt() ?: 0
+                        order = (modelMap["order"] as? Long)?.toInt() ?: 0,
+                        isPro = modelMap["isPro"] as? Boolean ?: false
                     )
                     modelsList.add(model)
                 }

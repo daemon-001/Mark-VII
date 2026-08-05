@@ -12,10 +12,29 @@
 #   public *;
 #}
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Retain line number and source file attributes for debugging and stack trace retracing
+-keepattributes SourceFile,LineNumberTable
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Keep data models used with Gson, Firebase, and Retrofit serialization
+-keepclassmembers class com.daemon.markvii.data.** {
+    <fields>;
+    <methods>;
+}
+-keep class com.daemon.markvii.data.** { *; }
+
+# Gson rules
+-keepattributes Signature
+-keepattributes *Annotation*
+-keep class sun.misc.Unsafe { *; }
+-keep class com.google.gson.** { *; }
+
+# Retrofit rules
+-dontwarn retrofit2.**
+-keep class retrofit2.** { *; }
+-keepclasseswithmembers class * {
+    @retrofit2.http.* <methods>;
+}
+
+# iText PDF rules (if applicable)
+-dontwarn com.itextpdf.**
+-keep class com.itextpdf.** { *; }

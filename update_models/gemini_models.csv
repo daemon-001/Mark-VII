@@ -1,15 +1,24 @@
-displayName,apiModel,isAvailable,order
-Gemini 2.5 Flash Lite,gemini-2.5-flash-lite,TRUE,1
-Gemini 2.5 Flash,gemini-2.5-flash,TRUE,2
-Gemini 2.5 Pro,gemini-2.5-pro,TRUE,3
-Gemini 2.0 Flash Lite,gemini-2.0-flash-lite,TRUE,4
-Gemini 2.0 Flash,gemini-2.0-flash,TRUE,5
-Gemini 3 Flash Preview,gemini-3-flash-preview,TRUE,6
-Gemini Robotics ER 1.5,gemini-robotics-er-1.5-preview,TRUE,7
-Gemma 3,gemma-3,TRUE,8
-Gemma 3N,gemma-3n,TRUE,9
-Gemini Embedding 001,gemini-embedding-001,TRUE,10
-Gemini 2.5 Flash Preview,gemini-2.5-flash-preview-09-2025,TRUE,11
-Gemini 2.5 Flash Preview TTS,gemini-2.5-flash-preview-tts,TRUE,12
-Gemini 2.5 Flash Lite Preview,gemini-2.5-flash-lite-preview-09-2025,TRUE,13
-Gemini 2.5 Flash Native Audio Preview,gemini-2.5-flash-native-audio-preview-09-2025,TRUE,14
+displayName,apiModel,isAvailable,order,isPro
+Gemini 3.6 Flash,gemini-3.6-flash,TRUE,1,FALSE
+Gemini 3.5 Flash,gemini-3.5-flash,TRUE,2,FALSE
+Gemini 3.5 Flash Lite,gemini-3.5-flash-lite,TRUE,3,FALSE
+Gemini 3.1 Pro Preview,gemini-3.1-pro-preview,TRUE,4,FALSE
+Gemini 3.1 Flash Lite,gemini-3.1-flash-lite,TRUE,5,FALSE
+Gemini 3 Flash Preview,gemini-3-flash-preview,TRUE,6,FALSE
+Gemini Robotics ER 1.6 Preview,gemini-robotics-er-1.6-preview,TRUE,7,FALSE
+
+Gemini 2.5 Pro,gemini-2.5-pro,TRUE,8,FALSE
+Gemini 2.5 Flash,gemini-2.5-flash,TRUE,9,FALSE
+Gemini 2.5 Flash Lite,gemini-2.5-flash-lite,TRUE,10,FALSE
+Gemini 2.5 Flash Preview,gemini-2.5-flash-preview-09-2025,TRUE,11,FALSE
+Gemini 2.5 Flash Preview TTS,gemini-2.5-flash-preview-tts,TRUE,12,FALSE
+Gemini 2.5 Flash Native Audio Preview,gemini-2.5-flash-native-audio-preview-09-2025,TRUE,13,FALSE
+Gemini 2.5 Flash Lite Preview,gemini-2.5-flash-lite-preview-09-2025,TRUE,14,FALSE
+
+Gemini 2.0 Flash,gemini-2.0-flash,TRUE,15,FALSE
+Gemini 2.0 Flash Lite,gemini-2.0-flash-lite,TRUE,16,FALSE
+
+Gemini Robotics ER 1.5,gemini-robotics-er-1.5-preview,TRUE,17,FALSE
+Gemma 3N,gemma-3n,TRUE,18,FALSE
+Gemma 3,gemma-3,TRUE,19,FALSE
+Gemini Embedding 001,gemini-embedding-001,TRUE,20,FALSE

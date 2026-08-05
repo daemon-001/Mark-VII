@@ -7,7 +7,8 @@ data class FirebaseModelInfo(
     val displayName: String = "",
     val apiModel: String = "",
     val isAvailable: Boolean = true,
-    val order: Int = 0
+    val order: Int = 0,
+    val isPro: Boolean = false
 )
 
 /**

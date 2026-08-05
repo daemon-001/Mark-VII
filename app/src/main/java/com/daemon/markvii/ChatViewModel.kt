@@ -43,13 +43,8 @@ class ChatViewModel : ViewModel() {
                     // Migrate local history to Firestore if needed
                     migrateLocalHistoryToFirestore(user.uid)
                 } else {
-                    // User signed out - start with empty chat
-                    _chatState.update { it.copy(
-                        chatList = mutableListOf(),
-                        chatSessions = emptyList(), 
-                        currentSessionId = null,
-                        showPromptSuggestions = true
-                    ) }
+                    // Guest user - load local guest sessions
+                    loadGuestSessions()
                 }
             }
         }
@@ -79,12 +74,19 @@ class ChatViewModel : ViewModel() {
             
             is ChatUiEvent.RetryPrompt -> {
                 if (event.prompt.isNotEmpty()) {
+                    if (event.targetProvider != null) {
+                        _chatState.update { it.copy(currentApiProvider = event.targetProvider) }
+                    }
+                    if (event.targetModel != null) {
+                        ChatData.selected_model = event.targetModel
+                    }
                     _chatState.update { it.copy(isGeneratingResponse = true) }
                     if (event.bitmap != null) {
                         getResponseWithImage(event.prompt, event.bitmap)
                     } else {
                         getResponse(
                             prompt = event.prompt,
+                            isRetry = true,
                             retryOfPrompt = event.retryOfPrompt,
                             historyTrimIndex = event.modelResponseIndex  // trim history to this point
                         )
@@ -246,6 +248,43 @@ class ChatViewModel : ViewModel() {
                         _chatState.update { state ->
                             val updatedSessions = state.chatSessions.map { s -> if (s.id == session.id) updatedSession else s }
                             state.currentUser?.let { user -> ChatHistoryManager.saveUserSessions(user.uid, updatedSessions) }
+                            state.copy(chatSessions = updatedSessions)
+                        }
+                    }
+                }
+            } else {
+                // Guest user: save session locally
+                val serializableMessages = FirestoreChatManager.chatListToSerializable(currentState.chatList)
+                if (currentState.currentSessionId == null && currentState.chatList.isNotEmpty()) {
+                    val firstUserMessage = currentState.chatList.lastOrNull { it.isFromUser }
+                    val title = firstUserMessage?.prompt?.take(50) ?: "New Chat"
+                    val newSession = ChatSession(
+                        id = UUID.randomUUID().toString(),
+                        userId = GUEST_USER_ID,
+                        title = title,
+                        messages = serializableMessages,
+                        createdAt = com.google.firebase.Timestamp.now(),
+                        updatedAt = com.google.firebase.Timestamp.now()
+                    )
+                    
+                    _chatState.update { state ->
+                        val newSessionsList = listOf(newSession) + state.chatSessions
+                        ChatHistoryManager.saveUserSessions(GUEST_USER_ID, newSessionsList)
+                        state.copy(
+                            currentSessionId = newSession.id,
+                            chatSessions = newSessionsList
+                        )
+                    }
+                } else if (currentState.currentSessionId != null) {
+                    val session = currentState.chatSessions.find { it.id == currentState.currentSessionId }
+                    if (session != null) {
+                        val updatedSession = session.copy(
+                            messages = serializableMessages,
+                            updatedAt = com.google.firebase.Timestamp.now()
+                        )
+                        _chatState.update { state ->
+                            val updatedSessions = state.chatSessions.map { s -> if (s.id == session.id) updatedSession else s }
+                            ChatHistoryManager.saveUserSessions(GUEST_USER_ID, updatedSessions)
                             state.copy(chatSessions = updatedSessions)
                         }
                     }
@@ -638,6 +677,23 @@ class ChatViewModel : ViewModel() {
     }
 
     /**
+     * Load all sessions for guest user from local cache
+     */
+    private fun loadGuestSessions() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val guestSessions = ChatHistoryManager.loadUserSessions(GUEST_USER_ID)
+            _chatState.update {
+                it.copy(
+                    chatSessions = guestSessions,
+                    currentSessionId = null,
+                    chatList = mutableListOf(),
+                    showPromptSuggestions = true
+                )
+            }
+        }
+    }
+
+    /**
      * Load all sessions for the current user from Firestore
      */
     private fun loadUserSessions(userId: String) {
@@ -683,11 +739,22 @@ class ChatViewModel : ViewModel() {
                     Log.e("ChatViewModel", "Failed to create session: ${error.message}")
                 }
             } else {
-                // Not signed in - just clear local chat
-                _chatState.update {
-                    it.copy(
+                // Guest session creation
+                val newSession = ChatSession(
+                    id = UUID.randomUUID().toString(),
+                    userId = GUEST_USER_ID,
+                    title = "New Chat",
+                    createdAt = com.google.firebase.Timestamp.now(),
+                    updatedAt = com.google.firebase.Timestamp.now(),
+                    messages = emptyList()
+                )
+                _chatState.update { state ->
+                    val updatedSessions = listOf(newSession) + state.chatSessions
+                    ChatHistoryManager.saveUserSessions(GUEST_USER_ID, updatedSessions)
+                    state.copy(
                         chatList = mutableListOf(),
-                        currentSessionId = null,
+                        currentSessionId = newSession.id,
+                        chatSessions = updatedSessions,
                         showPromptSuggestions = true,
                         isDrawerOpen = false
                     )
@@ -703,7 +770,7 @@ class ChatViewModel : ViewModel() {
     private fun switchToSession(sessionId: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val sessionInMemory = _chatState.value.chatSessions.find { it.id == sessionId }
-            if (sessionInMemory != null && sessionInMemory.messages.isNotEmpty()) {
+            if (sessionInMemory != null) {
                 val chatList = FirestoreChatManager.serializableToChatList(sessionInMemory.messages)
                 _chatState.update {
                     it.copy(
@@ -717,23 +784,26 @@ class ChatViewModel : ViewModel() {
                 return@launch
             }
 
-            val result = FirestoreChatManager.loadSession(sessionId)
-            result.onSuccess { session ->
-                val chatList = FirestoreChatManager.serializableToChatList(session.messages)
-                
-                _chatState.update {
-                    it.copy(
-                        chatList = chatList.toMutableList(),
-                        currentSessionId = sessionId,
-                        showPromptSuggestions = chatList.isEmpty(),
-                        isDrawerOpen = false
-                    )
+            val currentUser = _chatState.value.currentUser
+            if (currentUser != null) {
+                val result = FirestoreChatManager.loadSession(sessionId)
+                result.onSuccess { session ->
+                    val chatList = FirestoreChatManager.serializableToChatList(session.messages)
+                    
+                    _chatState.update {
+                        it.copy(
+                            chatList = chatList.toMutableList(),
+                            currentSessionId = sessionId,
+                            showPromptSuggestions = chatList.isEmpty(),
+                            isDrawerOpen = false
+                        )
+                    }
+                    
+                    // Save to local storage as well
+                    ChatHistoryManager.saveChatHistory(chatList)
+                }.onFailure { error ->
+                    Log.e("ChatViewModel", "Failed to switch session: ${error.message}")
                 }
-                
-                // Save to local storage as well
-                ChatHistoryManager.saveChatHistory(chatList)
-            }.onFailure { error ->
-                Log.e("ChatViewModel", "Failed to switch session: ${error.message}")
             }
         }
     }
@@ -743,8 +813,28 @@ class ChatViewModel : ViewModel() {
      */
     private fun renameSession(sessionId: String, newTitle: String) {
         viewModelScope.launch {
-            val result = FirestoreChatManager.renameSession(sessionId, newTitle)
-            result.onSuccess {
+            val currentUser = _chatState.value.currentUser
+            if (currentUser != null) {
+                val result = FirestoreChatManager.renameSession(sessionId, newTitle)
+                result.onSuccess {
+                    _chatState.update { state ->
+                        val updatedSessions = state.chatSessions.map { session ->
+                            if (session.id == sessionId) {
+                                session.copy(title = newTitle)
+                            } else {
+                                session
+                            }
+                        }
+                        val userId = state.currentUser?.uid
+                        if (userId != null) {
+                            ChatHistoryManager.saveUserSessions(userId, updatedSessions)
+                        }
+                        state.copy(chatSessions = updatedSessions)
+                    }
+                }.onFailure { error ->
+                    Log.e("ChatViewModel", "Failed to rename session: ${error.message}")
+                }
+            } else {
                 _chatState.update { state ->
                     val updatedSessions = state.chatSessions.map { session ->
                         if (session.id == sessionId) {
@@ -753,14 +843,9 @@ class ChatViewModel : ViewModel() {
                             session
                         }
                     }
-                    val userId = state.currentUser?.uid
-                    if (userId != null) {
-                        ChatHistoryManager.saveUserSessions(userId, updatedSessions)
-                    }
+                    ChatHistoryManager.saveUserSessions(GUEST_USER_ID, updatedSessions)
                     state.copy(chatSessions = updatedSessions)
                 }
-            }.onFailure { error ->
-                Log.e("ChatViewModel", "Failed to rename session: ${error.message}")
             }
         }
     }
@@ -770,15 +855,37 @@ class ChatViewModel : ViewModel() {
      */
     private fun deleteSession(sessionId: String) {
         viewModelScope.launch {
-            val result = FirestoreChatManager.deleteSession(sessionId)
-            result.onSuccess {
+            val currentUser = _chatState.value.currentUser
+            if (currentUser != null) {
+                val result = FirestoreChatManager.deleteSession(sessionId)
+                result.onSuccess {
+                    _chatState.update { state ->
+                        val updatedSessions = state.chatSessions.filter { it.id != sessionId }
+                        
+                        val userId = state.currentUser?.uid
+                        if (userId != null) {
+                            ChatHistoryManager.saveUserSessions(userId, updatedSessions)
+                        }
+
+                        // If we deleted the current session, switch to another or create new
+                        if (state.currentSessionId == sessionId) {
+                            val nextSession = updatedSessions.firstOrNull()
+                            if (nextSession != null) {
+                                switchToSession(nextSession.id)
+                            } else {
+                                createNewSession()
+                            }
+                        }
+                        
+                        state.copy(chatSessions = updatedSessions)
+                    }
+                }.onFailure { error ->
+                    Log.e("ChatViewModel", "Failed to delete session: ${error.message}")
+                }
+            } else {
                 _chatState.update { state ->
                     val updatedSessions = state.chatSessions.filter { it.id != sessionId }
-                    
-                    val userId = state.currentUser?.uid
-                    if (userId != null) {
-                        ChatHistoryManager.saveUserSessions(userId, updatedSessions)
-                    }
+                    ChatHistoryManager.saveUserSessions(GUEST_USER_ID, updatedSessions)
 
                     // If we deleted the current session, switch to another or create new
                     if (state.currentSessionId == sessionId) {
@@ -792,8 +899,6 @@ class ChatViewModel : ViewModel() {
                     
                     state.copy(chatSessions = updatedSessions)
                 }
-            }.onFailure { error ->
-                Log.e("ChatViewModel", "Failed to delete session: ${error.message}")
             }
         }
     }
@@ -803,23 +908,42 @@ class ChatViewModel : ViewModel() {
      */
     private fun migrateLocalHistoryToFirestore(userId: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            val localHistory = ChatHistoryManager.loadChatHistory()
-            
-            // Only migrate if there's local history and no Firestore sessions yet
-            if (localHistory.isNotEmpty()) {
+            val guestSessions = ChatHistoryManager.loadUserSessions(GUEST_USER_ID)
+            if (guestSessions.isNotEmpty()) {
                 val result = FirestoreChatManager.loadUserSessions(userId)
-                result.onSuccess { sessions ->
-                    if (sessions.isEmpty()) {
-                        // Create a session with the local history
-                        val createResult = FirestoreChatManager.createSession(userId, "Migrated Chat")
-                        createResult.onSuccess { newSession ->
-                            FirestoreChatManager.saveSession(newSession, localHistory)
-                            Log.d("ChatViewModel", "Migrated local history to Firestore")
+                result.onSuccess { existingSessions ->
+                    if (existingSessions.isEmpty()) {
+                        guestSessions.forEach { session ->
+                            val createResult = FirestoreChatManager.createSession(userId, session.title)
+                            createResult.onSuccess { newSession ->
+                                val chatList = FirestoreChatManager.serializableToChatList(session.messages)
+                                FirestoreChatManager.saveSession(newSession, chatList)
+                            }
+                        }
+                        ChatHistoryManager.clearUserSessionsCache(GUEST_USER_ID)
+                        // Reload user sessions
+                        loadUserSessions(userId)
+                    }
+                }
+            } else {
+                val localHistory = ChatHistoryManager.loadChatHistory()
+                if (localHistory.isNotEmpty()) {
+                    val result = FirestoreChatManager.loadUserSessions(userId)
+                    result.onSuccess { sessions ->
+                        if (sessions.isEmpty()) {
+                            val createResult = FirestoreChatManager.createSession(userId, "Migrated Chat")
+                            createResult.onSuccess { newSession ->
+                                FirestoreChatManager.saveSession(newSession, localHistory)
+                            }
                         }
                     }
                 }
             }
         }
+    }
+    
+    companion object {
+        private const val GUEST_USER_ID = "guest"
     }
 }
 

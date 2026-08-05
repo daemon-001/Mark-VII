@@ -7,14 +7,14 @@ plugins {
 
 android {
     namespace = "com.daemon.markvii"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.daemon.markvii"
         minSdk = 24
-        targetSdk = 34
-        versionCode = 30302
-        versionName = "3.3.2"
+        targetSdk = 36
+        versionCode = 30370
+        versionName = "3.3.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -24,11 +24,15 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
         }
     }
     compileOptions {

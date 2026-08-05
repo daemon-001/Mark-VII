@@ -43,11 +43,9 @@ fun ModelChatItem(
     response: String,
     userPrompt: String = "",
     modelUsed: String = "",
-    onRetry: (String) -> Unit = {},
+    onRetry: (com.daemon.markvii.data.GlobalModelInfo) -> Unit = {},
     isStreaming: Boolean = false,
-    freeModels: List<ModelInfo> = emptyList(),
-    geminiModels: List<ModelInfo> = emptyList(),
-    groqModels: List<ModelInfo> = emptyList(),
+    globalModels: List<com.daemon.markvii.data.GlobalModelInfo> = emptyList(),
     currentApiProvider: ApiProvider = ApiProvider.GEMINI,
     hasImage: Boolean = false,
     isError: Boolean = false,
@@ -64,7 +62,7 @@ fun ModelChatItem(
     val hapticFeedback = LocalHapticFeedback.current
     var showModelSelector by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
-    var selectedApiProvider by remember { mutableStateOf(currentApiProvider) }
+    var selectedApiProvider by remember(currentApiProvider) { mutableStateOf(currentApiProvider) }
     
     // Unified Smooth Streaming Engine
     var displayedText by remember { mutableStateOf("") }
@@ -409,261 +407,23 @@ fun ModelChatItem(
         
         // Model selector dialog for retry
         if (showModelSelector) {
-            AlertDialog(
+            com.daemon.markvii.ui.components.GlobalModelSelectorBottomSheet(
+                globalModels = globalModels,
+                currentApiProvider = selectedApiProvider,
+                onProviderSelected = { 
+                    selectedApiProvider = it
+                    onApiSwitch(it)
+                },
+                onModelSelected = { model ->
+                    ChatData.selected_model = model.apiModel
+                    selectedApiProvider = model.provider
+                    onApiSwitch(model.provider)
+                    showModelSelector = false
+                    onRetry(model)
+                },
                 onDismissRequest = { showModelSelector = false },
-                containerColor = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(20.dp),
-                title = {
-                    Text(
-                        text = "Retry with other models",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                },
-                text = {
-                    Column(
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        // API Provider Switch
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Gemini button
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(
-                                        if (selectedApiProvider == ApiProvider.GEMINI)
-                                            appColors.accent.copy(alpha = 0.2f)
-                                        else
-                                            appColors.surfaceVariant
-                                    )
-                                    .clickable {
-                                        selectedApiProvider = ApiProvider.GEMINI
-                                        onApiSwitch(ApiProvider.GEMINI)
-                                    }
-                                    .padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "Gemini",
-                                    color = if (selectedApiProvider == ApiProvider.GEMINI)
-                                        appColors.accent
-                                    else
-                                        appColors.textSecondary,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (selectedApiProvider == ApiProvider.GEMINI)
-                                        FontWeight.SemiBold
-                                    else
-                                        FontWeight.Normal
-                                )
-                            }
-                            
-                            Spacer(modifier = Modifier.width(8.dp))
-                            
-                            // OpenRouter button
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(
-                                        if (selectedApiProvider == ApiProvider.OPENROUTER)
-                                            appColors.accent.copy(alpha = 0.2f)
-                                        else
-                                            appColors.surfaceVariant
-                                    )
-                                    .clickable {
-                                        if (hasImage) {
-                                            Toast.makeText(
-                                                context,
-                                                "⚠️ OpenRouter doesn't support images. Please use Gemini for image queries.",
-                                                Toast.LENGTH_LONG
-                                            ).show()
-                                        } else {
-                                            selectedApiProvider = ApiProvider.OPENROUTER
-                                            onApiSwitch(ApiProvider.OPENROUTER)
-                                        }
-                                    }
-                                    .padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "OpenRouter",
-                                    color = if (selectedApiProvider == ApiProvider.OPENROUTER)
-                                        appColors.accent
-                                    else
-                                        appColors.textSecondary,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (selectedApiProvider == ApiProvider.OPENROUTER)
-                                        FontWeight.SemiBold
-                                    else
-                                        FontWeight.Normal
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            // Groq button
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(
-                                        if (selectedApiProvider == ApiProvider.GROQ)
-                                            appColors.accent.copy(alpha = 0.2f)
-                                        else
-                                            appColors.surfaceVariant
-                                    )
-                                    .clickable {
-                                        if (hasImage) {
-                                            Toast.makeText(
-                                                context,
-                                                "⚠️ Groq doesn't support images. Please use Gemini for image queries.",
-                                                Toast.LENGTH_LONG
-                                            ).show()
-                                        } else {
-                                            selectedApiProvider = ApiProvider.GROQ
-                                            onApiSwitch(ApiProvider.GROQ)
-                                        }
-                                    }
-                                    .padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "Groq",
-                                    color = if (selectedApiProvider == ApiProvider.GROQ)
-                                        appColors.accent
-                                    else
-                                        appColors.textSecondary,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (selectedApiProvider == ApiProvider.GROQ)
-                                        FontWeight.SemiBold
-                                    else
-                                        FontWeight.Normal
-                                )
-                            }
-                        }
-                        
-                        // Show warning if image exists and OpenRouter selected
-                        if (hasImage && selectedApiProvider == ApiProvider.OPENROUTER) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = 8.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(appColors.error.copy(alpha = 0.1f))
-                                    .padding(12.dp)
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = "⚠️",
-                                        fontSize = 16.sp,
-                                        modifier = Modifier.padding(end = 8.dp)
-                                    )
-                                    Text(
-                                        text = "Images are not supported with OpenRouter",
-                                        color = appColors.error,
-                                        fontSize = 13.sp
-                                    )
-                                }
-                            }
-                        }
-                        
-                        // Divider
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp)
-                                .height(1.dp)
-                                .background(appColors.divider)
-                        )
-                        
-                        // Model List
-                        val currentModels = when (selectedApiProvider) {
-                            ApiProvider.GEMINI -> geminiModels
-                            ApiProvider.OPENROUTER -> freeModels
-                            ApiProvider.GROQ -> groqModels
-                        }
-                        
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 400.dp)
-                        ) {
-                            if (currentModels.isEmpty()) {
-                                item {
-                                    Text(
-                                        text = "Loading models...",
-                                        color = appColors.textSecondary,
-                                        modifier = Modifier.padding(16.dp)
-                                    )
-                                }
-                            } else {
-                                itemsIndexed(currentModels) { _, model ->
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 4.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(
-                                                if (model.apiModel == modelUsed)
-                                                    appColors.accent.copy(alpha = 0.1f)
-                                                else
-                                                    Color.Transparent
-                                            )
-                                            .clickable {
-                                                if (hasImage && selectedApiProvider == ApiProvider.OPENROUTER) {
-                                                    Toast.makeText(
-                                                        context,
-                                                        "⚠️ Cannot use OpenRouter with images. Switch to Gemini.",
-                                                        Toast.LENGTH_SHORT
-                                                    ).show()
-                                                } else {
-                                                    ChatData.selected_model = model.apiModel
-                                                    showModelSelector = false
-                                                    onRetry(model.apiModel)
-                                                }
-                                            }
-                                            .padding(12.dp)
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = model.displayName,
-                                                color = if (model.apiModel == modelUsed)
-                                                    appColors.accent
-                                                else
-                                                    MaterialTheme.colorScheme.onSurface,
-                                                fontSize = 15.sp,
-                                                fontWeight = if (model.apiModel == modelUsed)
-                                                    FontWeight.SemiBold
-                                                else
-                                                    FontWeight.Normal
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = { showModelSelector = false },
-                        colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                            contentColor = appColors.textSecondary
-                        )
-                    ) {
-                        Text("Cancel", fontSize = 15.sp)
-                    }
-                }
+                hasImage = hasImage,
+                selectedModelId = ChatData.selected_model
             )
         }
         

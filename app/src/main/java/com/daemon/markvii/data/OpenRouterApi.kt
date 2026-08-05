@@ -77,6 +77,7 @@ data class ModelData(
     val id: String,
     val name: String?,
     val description: String?,
+    val created: Long?,
     val pricing: ModelPricing?,
     val context_length: Int?,
     val architecture: ModelArchitecture?,
