@@ -2,6 +2,8 @@ package com.daemon.markvii.data
 
 import android.graphics.Bitmap
 import android.util.Base64
+import androidx.annotation.Keep
+import com.google.gson.annotations.SerializedName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -13,13 +15,14 @@ import java.io.ByteArrayOutputStream
 /**
  * Data class to hold model information
  */
+@Keep
 data class ModelInfo(
-    val displayName: String,
-    val apiModel: String,
-    val isAvailable: Boolean = true,
-    val isPro: Boolean = false,
-    val isPaid: Boolean = false,
-    val created: Long = 0
+    @SerializedName("displayName") val displayName: String,
+    @SerializedName("apiModel") val apiModel: String,
+    @SerializedName("isAvailable") val isAvailable: Boolean = true,
+    @SerializedName("isPro") val isPro: Boolean = false,
+    @SerializedName("isPaid") val isPaid: Boolean = false,
+    @SerializedName("created") val created: Long = 0
 )
 
 object ChatData {
@@ -31,7 +34,7 @@ object ChatData {
     var groq_api_key: String = ""
 
     var selected_model = ""
-    
+
     // Cache for free models so we do not re-fetch on view recreation
     var cachedFreeModels: List<ModelInfo> = emptyList()
     var cachedFreeModelsKey: String = ""
@@ -69,6 +72,7 @@ object ChatData {
             }
             response.data ?: emptyList()
         } catch (e: Exception) {
+            android.util.Log.e("ChatData", "Error fetching OpenRouter models", e)
             emptyList()
         }
     }
@@ -82,11 +86,15 @@ object ChatData {
             val exceptionModelsMap = FirebaseConfigManager.exceptionModels.value
             
             val allModels = fetchAvailableModels()
+            if (allModels.isEmpty()) {
+                return emptyList()
+            }
             
             // Use a map to deduplicate models by base ID (without :free suffix)
             val uniqueModels = mutableMapOf<String, ModelInfo>()
             
             allModels.forEach { model ->
+                if (model.id.isBlank()) return@forEach
                 val pricing = model.pricing
                 val promptPrice = pricing?.prompt?.toDoubleOrNull() ?: 0.0
                 val completionPrice = pricing?.completion?.toDoubleOrNull() ?: 0.0
@@ -138,6 +146,7 @@ object ChatData {
                 compareBy<ModelInfo> { it.isPaid }.thenByDescending { it.created }
             )
         } catch (e: Exception) {
+            android.util.Log.e("ChatData", "Error processing OpenRouter models", e)
             emptyList()
         }
     }
@@ -198,6 +207,7 @@ object ChatData {
                 }
                 .sortedByDescending { it.created }
         } catch (e: Exception) {
+            android.util.Log.e("ChatData", "Error fetching Groq models", e)
             emptyList()
         }
     }
@@ -239,21 +249,19 @@ object ChatData {
         try {
             // OpenRouter prefetch
             val openRouterKey = FirebaseConfigManager.apiKey.value
-            if (openRouterKey.isNotEmpty()) {
-                val exceptionModels = FirebaseConfigManager.exceptionModels.value
-                val cacheKey = "$openRouterKey|${exceptionModels.hashCode()}"
-                
-                val cached = ModelsCacheManager.getOpenRouterModels(cacheKey)
-                if (cached != null && cached.isNotEmpty()) {
-                    cachedFreeModels = cached
+            val exceptionModels = FirebaseConfigManager.exceptionModels.value
+            val cacheKey = "$openRouterKey|${exceptionModels.hashCode()}"
+            
+            val cached = ModelsCacheManager.getOpenRouterModels(cacheKey)
+            if (cached != null && cached.isNotEmpty()) {
+                cachedFreeModels = cached
+                cachedFreeModelsKey = cacheKey
+            } else {
+                val openRouterModels = fetchFreeModels()
+                if (openRouterModels.isNotEmpty()) {
+                    cachedFreeModels = openRouterModels
                     cachedFreeModelsKey = cacheKey
-                } else {
-                    val openRouterModels = fetchFreeModels()
-                    if (openRouterModels.isNotEmpty()) {
-                        cachedFreeModels = openRouterModels
-                        cachedFreeModelsKey = cacheKey
-                        ModelsCacheManager.saveOpenRouterModels(openRouterModels, cacheKey)
-                    }
+                    ModelsCacheManager.saveOpenRouterModels(openRouterModels, cacheKey)
                 }
             }
             
@@ -262,23 +270,22 @@ object ChatData {
             val userGroqKey = com.daemon.markvii.data.UserApiPreferences.groqApiKey.value
             val isUserGroqEnabled = com.daemon.markvii.data.UserApiPreferences.isGroqKeyEnabled.value
             val keyToUse = if (isUserGroqEnabled && userGroqKey.isNotBlank()) userGroqKey else firebaseGroqApiKey
+            val groqCacheKey = if (keyToUse.isNotBlank()) keyToUse else "default_groq"
             
-            if (keyToUse.isNotBlank()) {
-                val cachedGroq = ModelsCacheManager.getGroqModels(keyToUse)
-                if (cachedGroq != null && cachedGroq.isNotEmpty()) {
-                    cachedGroqModels = cachedGroq
-                    cachedGroqModelsKey = keyToUse
-                } else {
-                    val groqModelsList = fetchGroqModels()
-                    if (groqModelsList.isNotEmpty()) {
-                        cachedGroqModels = groqModelsList
-                        cachedGroqModelsKey = keyToUse
-                        ModelsCacheManager.saveGroqModels(groqModelsList, keyToUse)
-                    }
+            val cachedGroq = ModelsCacheManager.getGroqModels(groqCacheKey)
+            if (cachedGroq != null && cachedGroq.isNotEmpty()) {
+                cachedGroqModels = cachedGroq
+                cachedGroqModelsKey = groqCacheKey
+            } else {
+                val groqModelsList = fetchGroqModels()
+                if (groqModelsList.isNotEmpty()) {
+                    cachedGroqModels = groqModelsList
+                    cachedGroqModelsKey = groqCacheKey
+                    ModelsCacheManager.saveGroqModels(groqModelsList, groqCacheKey)
                 }
             }
         } catch (e: Exception) {
-            // Silently fail prefetch if network issues occur
+            android.util.Log.e("ChatData", "Error in prefetchModelsInBackground", e)
         }
     }
     

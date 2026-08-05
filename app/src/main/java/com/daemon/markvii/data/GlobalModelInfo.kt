@@ -1,7 +1,9 @@
 package com.daemon.markvii.data
 
+import androidx.annotation.Keep
 import com.daemon.markvii.ApiProvider
 
+@Keep
 data class GlobalModelInfo(
     val apiModel: String,
     val displayName: String,

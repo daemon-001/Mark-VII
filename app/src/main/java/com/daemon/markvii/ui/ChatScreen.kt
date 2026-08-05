@@ -198,42 +198,40 @@ fun ChatScreen(
         }
     }
     
-    // Load free models from OpenRouter AFTER Firebase initializes
+    // Load free models from OpenRouter
     // Observe exception models to trigger reload when they change
     val exceptionModels by FirebaseConfigManager.exceptionModels.collectAsState()
     
-    LaunchedEffect(firebaseApiKey, exceptionModels, reloadTrigger) {
-        if (firebaseApiKey.isNotEmpty()) {
-            // Build a cache key that changes when either API key or exception models change
-            val modelsCacheKey = "$firebaseApiKey|${exceptionModels.hashCode()}"
+    LaunchedEffect(firebaseApiKey, userOpenRouterKey, isUserOpenRouterEnabled, exceptionModels, reloadTrigger) {
+        val keyToUse = if (isUserOpenRouterEnabled && userOpenRouterKey.isNotBlank()) userOpenRouterKey else firebaseApiKey
+        val modelsCacheKey = "$keyToUse|${exceptionModels.hashCode()}"
 
-            // If we already have cached models with the same cache key in memory, reuse them
-            if (ChatData.cachedFreeModels.isNotEmpty() && ChatData.cachedFreeModelsKey == modelsCacheKey) {
-                // Models already cached, use them directly without showing loading
-                freeModels = ChatData.cachedFreeModels
+        // If we already have cached models with the same cache key in memory, reuse them
+        if (ChatData.cachedFreeModels.isNotEmpty() && ChatData.cachedFreeModelsKey == modelsCacheKey) {
+            // Models already cached, use them directly without showing loading
+            freeModels = ChatData.cachedFreeModels
+            isLoadingModels = false
+        } else {
+            // Check disk cache first before showing loading dialog
+            val diskModels = com.daemon.markvii.data.ModelsCacheManager.getOpenRouterModels(modelsCacheKey)
+            if (diskModels != null && diskModels.isNotEmpty()) {
+                ChatData.cachedFreeModels = diskModels
+                ChatData.cachedFreeModelsKey = modelsCacheKey
+                freeModels = diskModels
                 isLoadingModels = false
             } else {
-                // Check disk cache first before showing loading dialog
-                val diskModels = com.daemon.markvii.data.ModelsCacheManager.getOpenRouterModels(modelsCacheKey)
-                if (diskModels != null && diskModels.isNotEmpty()) {
-                    ChatData.cachedFreeModels = diskModels
-                    ChatData.cachedFreeModelsKey = modelsCacheKey
-                    freeModels = diskModels
-                    isLoadingModels = false
-                } else {
-                    // Only show loading if we need to fetch new models from network
-                    isLoadingModels = true
-                    try {
-                        // Use the convenience method which caches the result in ChatData
-                        freeModels = ChatData.getOrFetchFreeModels(modelsCacheKey)
-                        if (freeModels.isEmpty()) {
-                            modelsLoadError = "No free models available"
-                        }
-                    } catch (e: Exception) {
-                        modelsLoadError = "Failed to load models: ${e.message}"
-                    } finally {
-                        isLoadingModels = false
+                // Only show loading if we need to fetch new models from network
+                isLoadingModels = true
+                try {
+                    val fetched = ChatData.getOrFetchFreeModels(modelsCacheKey)
+                    freeModels = fetched
+                    if (fetched.isEmpty()) {
+                        modelsLoadError = "No models available"
                     }
+                } catch (e: Exception) {
+                    modelsLoadError = "Failed to load models: ${e.message}"
+                } finally {
+                    isLoadingModels = false
                 }
             }
         }
@@ -242,22 +240,20 @@ fun ChatScreen(
     // Load Groq models when Groq key changes (Firebase or user override)
     LaunchedEffect(firebaseGroqApiKey, userGroqKey, isUserGroqEnabled, reloadTrigger) {
         val keyToUse = if (isUserGroqEnabled && userGroqKey.isNotBlank()) userGroqKey else firebaseGroqApiKey
-        if (keyToUse.isNotBlank()) {
-            val cacheKey = keyToUse
-            if (ChatData.cachedGroqModels.isNotEmpty() && ChatData.cachedGroqModelsKey == cacheKey) {
-                groqModels = ChatData.cachedGroqModels
+        val cacheKey = if (keyToUse.isNotBlank()) keyToUse else "groq_api"
+        if (ChatData.cachedGroqModels.isNotEmpty() && ChatData.cachedGroqModelsKey == cacheKey) {
+            groqModels = ChatData.cachedGroqModels
+        } else {
+            val diskGroq = com.daemon.markvii.data.ModelsCacheManager.getGroqModels(cacheKey)
+            if (diskGroq != null && diskGroq.isNotEmpty()) {
+                ChatData.cachedGroqModels = diskGroq
+                ChatData.cachedGroqModelsKey = cacheKey
+                groqModels = diskGroq
             } else {
-                val diskGroq = com.daemon.markvii.data.ModelsCacheManager.getGroqModels(cacheKey)
-                if (diskGroq != null && diskGroq.isNotEmpty()) {
-                    ChatData.cachedGroqModels = diskGroq
-                    ChatData.cachedGroqModelsKey = cacheKey
-                    groqModels = diskGroq
-                } else {
-                    try {
-                        groqModels = ChatData.getOrFetchGroqModels(cacheKey)
-                    } catch (e: Exception) {
-                        groqModels = emptyList()
-                    }
+                try {
+                    groqModels = ChatData.getOrFetchGroqModels(cacheKey)
+                } catch (e: Exception) {
+                    groqModels = emptyList()
                 }
             }
         }
@@ -917,6 +913,9 @@ fun ChatScreen(
             hasImage = bitmap != null,
             selectedModelId = ChatData.selected_model,
             onReloadModels = {
+                coroutineScope.launch {
+                    FirebaseConfigManager.initialize(forceRefresh = true)
+                }
                 com.daemon.markvii.data.ModelsCacheManager.clearAllModels()
                 ChatData.cachedFreeModels = emptyList()
                 ChatData.cachedFreeModelsKey = ""

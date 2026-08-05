@@ -9,13 +9,17 @@ object ModelsCacheManager {
     private const val PREFS_NAME = "models_cache_prefs"
     private const val KEY_OPENROUTER_MODELS = "openrouter_models"
     private const val KEY_OPENROUTER_CACHE_KEY = "openrouter_cache_key"
-    
+
     private const val KEY_GROQ_MODELS = "groq_models"
     private const val KEY_GROQ_CACHE_KEY = "groq_cache_key"
 
     private lateinit var prefs: SharedPreferences
     private val gson = Gson()
-    private val listType = object : TypeToken<List<ModelInfo>>() {}.type
+
+    // R8-safe: use TypeToken.getParameterized() instead of anonymous subclass
+    // Anonymous TypeToken subclasses get their generic types erased by R8 in release builds,
+    // causing "java.lang.Class cannot be cast to java.lang.reflect.ParameterizedType"
+    private val listType = TypeToken.getParameterized(List::class.java, ModelInfo::class.java).type
 
     fun init(context: Context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -38,6 +42,7 @@ object ModelsCacheManager {
         return try {
             gson.fromJson<List<ModelInfo>>(json, listType)
         } catch (e: Exception) {
+            android.util.Log.e("ModelsCacheManager", "Error deserializing OpenRouter models", e)
             null
         }
     }
@@ -59,10 +64,11 @@ object ModelsCacheManager {
         return try {
             gson.fromJson<List<ModelInfo>>(json, listType)
         } catch (e: Exception) {
+            android.util.Log.e("ModelsCacheManager", "Error deserializing Groq models", e)
             null
         }
     }
-    
+
     fun clearAllModels() {
         prefs.edit().clear().apply()
     }

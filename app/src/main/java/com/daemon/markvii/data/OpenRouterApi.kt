@@ -11,96 +11,115 @@ import retrofit2.http.POST
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
+import androidx.annotation.Keep
+import com.daemon.markvii.BuildConfig
+import com.google.gson.annotations.SerializedName
+
 /**
  * OpenRouter API Data Models
  */
+@Keep
 data class OpenRouterKeyInfo(
-    val label: String?,
-    val usage: Double,
-    val limit: Double?,
-    val isFreeTier: Boolean
+    @SerializedName("label") val label: String?,
+    @SerializedName("usage") val usage: Double,
+    @SerializedName("limit") val limit: Double?,
+    @SerializedName("is_free_tier") val isFreeTier: Boolean
 )
+
+@Keep
 data class OpenRouterRequest(
-    val model: String,
-    val messages: List<Message>,
-    val max_tokens: Int = 1000,
-    val temperature: Double = 0.7,
-    val stream: Boolean = false
+    @SerializedName("model") val model: String,
+    @SerializedName("messages") val messages: List<Message>,
+    @SerializedName("max_tokens") val max_tokens: Int = 1000,
+    @SerializedName("temperature") val temperature: Double = 0.7,
+    @SerializedName("stream") val stream: Boolean = false
 )
 
+@Keep
 data class Message(
-    val role: String,
-    val content: List<Content>
+    @SerializedName("role") val role: String,
+    @SerializedName("content") val content: List<Content>
 )
 
+@Keep
 data class Content(
-    val type: String,
-    val text: String? = null,
-    val image_url: ImageUrl? = null
+    @SerializedName("type") val type: String,
+    @SerializedName("text") val text: String? = null,
+    @SerializedName("image_url") val image_url: ImageUrl? = null
 )
 
+@Keep
 data class ImageUrl(
-    val url: String
+    @SerializedName("url") val url: String
 )
 
+@Keep
 data class OpenRouterResponse(
-    val id: String?,
-    val model: String?,
-    val choices: List<Choice>?,
-    val error: ErrorResponse?
+    @SerializedName("id") val id: String?,
+    @SerializedName("model") val model: String?,
+    @SerializedName("choices") val choices: List<Choice>?,
+    @SerializedName("error") val error: ErrorResponse?
 )
 
+@Keep
 data class Choice(
-    val message: MessageResponse,
-    val finish_reason: String?
+    @SerializedName("message") val message: MessageResponse,
+    @SerializedName("finish_reason") val finish_reason: String?
 )
 
+@Keep
 data class MessageResponse(
-    val role: String,
-    val content: String
+    @SerializedName("role") val role: String,
+    @SerializedName("content") val content: String
 )
 
+@Keep
 data class ErrorResponse(
-    val message: String,
-    val type: String?,
-    val code: String?
+    @SerializedName("message") val message: String,
+    @SerializedName("type") val type: String?,
+    @SerializedName("code") val code: String?
 )
 
 /**
  * Models API Response Data Models
  */
+@Keep
 data class OpenRouterModelsResponse(
-    val data: List<ModelData>?
+    @SerializedName("data") val data: List<ModelData>?
 )
 
+@Keep
 data class ModelData(
-    val id: String,
-    val name: String?,
-    val description: String?,
-    val created: Long?,
-    val pricing: ModelPricing?,
-    val context_length: Int?,
-    val architecture: ModelArchitecture?,
-    val top_provider: ModelProvider?
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String?,
+    @SerializedName("description") val description: String?,
+    @SerializedName("created") val created: Long?,
+    @SerializedName("pricing") val pricing: ModelPricing?,
+    @SerializedName("context_length") val context_length: Int?,
+    @SerializedName("architecture") val architecture: ModelArchitecture?,
+    @SerializedName("top_provider") val top_provider: ModelProvider?
 )
 
+@Keep
 data class ModelPricing(
-    val prompt: String?,
-    val completion: String?,
-    val request: String?,
-    val image: String?
+    @SerializedName("prompt") val prompt: String?,
+    @SerializedName("completion") val completion: String?,
+    @SerializedName("request") val request: String?,
+    @SerializedName("image") val image: String?
 )
 
+@Keep
 data class ModelArchitecture(
-    val modality: String?,
-    val tokenizer: String?,
-    val instruct_type: String?
+    @SerializedName("modality") val modality: String?,
+    @SerializedName("tokenizer") val tokenizer: String?,
+    @SerializedName("instruct_type") val instruct_type: String?
 )
 
+@Keep
 data class ModelProvider(
-    val context_length: Int?,
-    val max_completion_tokens: Int?,
-    val is_moderated: Boolean?
+    @SerializedName("context_length") val context_length: Int?,
+    @SerializedName("max_completion_tokens") val max_completion_tokens: Int?,
+    @SerializedName("is_moderated") val is_moderated: Boolean?
 )
 
 /**
@@ -134,7 +153,7 @@ object OpenRouterClient {
     }
     
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
+        level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
     }
     
     private val okHttpClient = OkHttpClient.Builder()

@@ -167,13 +167,14 @@ object ChatHistoryManager {
     /**
      * Serializable version of Chat for JSON storage
      */
+    @androidx.annotation.Keep
     private data class SerializableChat(
-        val prompt: String,
-        val bitmapBase64: String?,
-        val isFromUser: Boolean,
-        val modelUsed: String,
-        val isStreaming: Boolean,
-        val id: String,
-        val retryOfPrompt: String? = null
+        @com.google.gson.annotations.SerializedName("prompt") val prompt: String,
+        @com.google.gson.annotations.SerializedName("bitmapBase64") val bitmapBase64: String?,
+        @com.google.gson.annotations.SerializedName("isFromUser") val isFromUser: Boolean,
+        @com.google.gson.annotations.SerializedName("modelUsed") val modelUsed: String,
+        @com.google.gson.annotations.SerializedName("isStreaming") val isStreaming: Boolean,
+        @com.google.gson.annotations.SerializedName("id") val id: String,
+        @com.google.gson.annotations.SerializedName("retryOfPrompt") val retryOfPrompt: String? = null
     )
 }

@@ -9,6 +9,10 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import java.util.concurrent.TimeUnit
 
+import androidx.annotation.Keep
+import com.daemon.markvii.BuildConfig
+import com.google.gson.annotations.SerializedName
+
 /**
  * Groq API Data Models
  * Groq uses the same OpenAI-compatible request/response format as OpenRouter.
@@ -16,19 +20,21 @@ import java.util.concurrent.TimeUnit
  * and ErrorResponse from OpenRouterApi.kt.
  */
 
+@Keep
 data class GroqModelsResponse(
-    val `object`: String?,
-    val data: List<GroqModelData>?
+    @SerializedName("object") val `object`: String?,
+    @SerializedName("data") val data: List<GroqModelData>?
 )
 
+@Keep
 data class GroqModelData(
-    val id: String,
-    val `object`: String?,
-    val created: Long?,
-    val owned_by: String?,
-    val active: Boolean?,
-    val context_window: Int?,
-    val public_apps: Any?
+    @SerializedName("id") val id: String,
+    @SerializedName("object") val `object`: String?,
+    @SerializedName("created") val created: Long?,
+    @SerializedName("owned_by") val owned_by: String?,
+    @SerializedName("active") val active: Boolean?,
+    @SerializedName("context_window") val context_window: Int?,
+    @SerializedName("public_apps") val public_apps: Any?
 )
 
 /**
@@ -61,7 +67,7 @@ object GroqClient {
     }
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
+        level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
     }
 
     private val okHttpClient = OkHttpClient.Builder()
