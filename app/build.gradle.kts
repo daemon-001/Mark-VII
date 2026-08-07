@@ -12,7 +12,7 @@ android {
         applicationId = "com.daemon.markvii"
         minSdk = 24
         targetSdk = 36
-        versionCode = 30371
+        versionCode = 30374
         versionName = "3.3.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

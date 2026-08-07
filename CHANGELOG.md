@@ -3,6 +3,18 @@
 All notable changes to the Mark VII project are documented in this file.
 
 ---
+## v3.3.7 (30374)
+August 7, 2026
+
+### Features & Updates
+- **Global Model Selector**: Added a global model selector with model caching and guest session support.
+- **Model Loading**: Optimized model loading with a cache-first flow.
+- **Build & Dependencies**: Upgraded AGP and Gradle, enabled R8 optimizations, and fixed Compose API updates.
+
+### Bug Fixes
+- **Model Display**: Fixed an issue where the selected model was not showing in release builds.
+
+---
 ## v3.3.2 (30302)
 August 2, 2026
 
