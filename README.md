@@ -13,6 +13,37 @@
 
 </div>
 
+## 🧪 Early Access Testing
+
+Mark VII is currently available in **Google Play Early Access**. If you'd like to test new features before the public release and help improve the app, follow the steps below.
+
+### Step 1: Join the Google Group (Required)
+
+You **must join the Google Group** before you can become a tester.
+
+🔗 https://groups.google.com/g/devwizpro/
+
+---
+
+### Step 2: Opt in to Beta Testing
+
+After joining the Google Group, open the tester link and accept the invitation.
+
+🔗 https://play.google.com/apps/testing/com.daemon.markvii
+
+> **Note:** If you see a "Not Found" or "App not available" message, make sure you've joined the Google Group using the **same Google account** you'll use for testing.
+
+---
+
+### Step 3: Install from Google Play
+
+Once you've joined the beta program, the Play Store listing will become available.
+
+🔗 https://play.google.com/store/apps/details?id=com.daemon.markvii
+
+If you already have the app installed, update it to the latest Early Access version.
+
+
 ---
 
 ## Overview
